@@ -224,9 +224,13 @@ export default function Analytics() {
         }))
       );
 
-      // Agent metrics
+      // Agent metrics - only show selected agent or all
       const agentStatsMap = new Map<string, AgentMetric>();
-      (agentsData || []).forEach((agent) => {
+      const agentsToProcess = selectedAgent !== "all" 
+        ? (agentsData || []).filter(a => a.id === selectedAgent)
+        : (agentsData || []);
+      
+      agentsToProcess.forEach((agent) => {
         agentStatsMap.set(agent.id, {
           id: agent.id,
           name: agent.name,

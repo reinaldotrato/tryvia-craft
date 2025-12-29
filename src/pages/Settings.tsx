@@ -835,76 +835,215 @@ export default function Settings() {
           </GlassCard>
         </TabsContent>
 
-        {/* Billing */}
+        {/* Billing / Plans */}
         <TabsContent value="billing">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <GlassCard className="p-6 space-y-6">
-              <div className="flex items-center justify-between">
+          <div className="space-y-6">
+            {/* Current Plan Status */}
+            <GlassCard className="p-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Plano Atual</p>
+                  <p className="text-sm text-muted-foreground mb-1">Plano Atual</p>
                   <h3 className="text-2xl font-bold gradient-text capitalize">
                     {tenant?.plan || "Starter"}
                   </h3>
                 </div>
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-foreground">
-                    {tenant?.plan === "enterprise" ? "Sob consulta" : tenant?.plan === "pro" ? "R$ 99" : "Grátis"}
-                  </p>
-                  {tenant?.plan !== "enterprise" && tenant?.plan !== "starter" && (
-                    <p className="text-sm text-muted-foreground">/mês</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Agentes</span>
-                    <span className="text-foreground">{agentsCount} / {tenant?.max_agents || 3}</span>
+                <div className="flex gap-4">
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-foreground">{agentsCount}</p>
+                    <p className="text-xs text-muted-foreground">de {tenant?.max_agents || 3} Agentes</p>
                   </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-purple to-pink rounded-full"
-                      style={{ width: `${Math.min((agentsCount / (tenant?.max_agents || 3)) * 100, 100)}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Mensagens (este mês)</span>
-                    <span className="text-foreground">{messagesCount} / {tenant?.max_messages_month || 1000}</span>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-purple to-pink rounded-full"
-                      style={{ width: `${Math.min((messagesCount / (tenant?.max_messages_month || 1000)) * 100, 100)}%` }}
-                    />
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-foreground">{messagesCount}</p>
+                    <p className="text-xs text-muted-foreground">de {tenant?.max_messages_month || 1000} Mensagens</p>
                   </div>
                 </div>
               </div>
-
-              {tenant?.plan !== "enterprise" && (
-                <Button className="w-full">Fazer Upgrade</Button>
-              )}
             </GlassCard>
 
+            {/* Plans Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Starter Plan */}
+              <GlassCard className={`p-6 space-y-6 relative ${tenant?.plan === 'starter' ? 'ring-2 ring-purple' : ''}`}>
+                {tenant?.plan === 'starter' && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="bg-purple text-primary-foreground text-xs font-bold px-3 py-1 rounded-full">
+                      Plano Atual
+                    </span>
+                  </div>
+                )}
+                <div className="text-center">
+                  <h3 className="text-xl font-bold text-foreground">Starter</h3>
+                  <p className="text-muted-foreground text-sm mt-1">Para começar</p>
+                </div>
+                <div className="text-center">
+                  <span className="text-4xl font-bold text-foreground">Grátis</span>
+                </div>
+                <ul className="space-y-3">
+                  <li className="flex items-center gap-2 text-sm">
+                    <Check className="w-4 h-4 text-success" />
+                    <span className="text-muted-foreground">Até 3 agentes</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-sm">
+                    <Check className="w-4 h-4 text-success" />
+                    <span className="text-muted-foreground">1.000 mensagens/mês</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-sm">
+                    <Check className="w-4 h-4 text-success" />
+                    <span className="text-muted-foreground">Suporte da comunidade</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-sm">
+                    <Check className="w-4 h-4 text-success" />
+                    <span className="text-muted-foreground">Relatórios básicos</span>
+                  </li>
+                </ul>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  disabled={tenant?.plan === 'starter'}
+                >
+                  {tenant?.plan === 'starter' ? 'Plano Atual' : 'Selecionar'}
+                </Button>
+              </GlassCard>
+
+              {/* Pro Plan */}
+              <GlassCard className={`p-6 space-y-6 relative ${tenant?.plan === 'pro' ? 'ring-2 ring-purple' : 'ring-1 ring-pink/50'}`} glow="pink">
+                {tenant?.plan === 'pro' ? (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="bg-purple text-primary-foreground text-xs font-bold px-3 py-1 rounded-full">
+                      Plano Atual
+                    </span>
+                  </div>
+                ) : (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="bg-gradient-to-r from-pink to-purple text-primary-foreground text-xs font-bold px-3 py-1 rounded-full">
+                      Mais Popular
+                    </span>
+                  </div>
+                )}
+                <div className="text-center">
+                  <h3 className="text-xl font-bold text-foreground">Pro</h3>
+                  <p className="text-muted-foreground text-sm mt-1">Para equipes em crescimento</p>
+                </div>
+                <div className="text-center">
+                  <span className="text-4xl font-bold text-foreground">R$ 99</span>
+                  <span className="text-muted-foreground">/mês</span>
+                </div>
+                <ul className="space-y-3">
+                  <li className="flex items-center gap-2 text-sm">
+                    <Check className="w-4 h-4 text-success" />
+                    <span className="text-muted-foreground">Até 10 agentes</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-sm">
+                    <Check className="w-4 h-4 text-success" />
+                    <span className="text-muted-foreground">10.000 mensagens/mês</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-sm">
+                    <Check className="w-4 h-4 text-success" />
+                    <span className="text-muted-foreground">Suporte por Email + Chat</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-sm">
+                    <Check className="w-4 h-4 text-success" />
+                    <span className="text-muted-foreground">Relatórios avançados</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-sm">
+                    <Check className="w-4 h-4 text-success" />
+                    <span className="text-muted-foreground">Integrações ilimitadas</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-sm">
+                    <Check className="w-4 h-4 text-success" />
+                    <span className="text-muted-foreground">API completa</span>
+                  </li>
+                </ul>
+                <Button 
+                  className="w-full bg-gradient-to-r from-purple to-pink hover:opacity-90"
+                  disabled={tenant?.plan === 'pro'}
+                  onClick={() => toast({ title: "Checkout", description: "Redirecionando para checkout do plano Pro..." })}
+                >
+                  {tenant?.plan === 'pro' ? 'Plano Atual' : 'Fazer Upgrade'}
+                </Button>
+              </GlassCard>
+
+              {/* Enterprise Plan */}
+              <GlassCard className={`p-6 space-y-6 relative ${tenant?.plan === 'enterprise' ? 'ring-2 ring-purple' : ''}`}>
+                {tenant?.plan === 'enterprise' && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="bg-purple text-primary-foreground text-xs font-bold px-3 py-1 rounded-full">
+                      Plano Atual
+                    </span>
+                  </div>
+                )}
+                <div className="text-center">
+                  <h3 className="text-xl font-bold text-foreground">Enterprise</h3>
+                  <p className="text-muted-foreground text-sm mt-1">Para grandes empresas</p>
+                </div>
+                <div className="text-center">
+                  <span className="text-4xl font-bold text-foreground">Sob Consulta</span>
+                </div>
+                <ul className="space-y-3">
+                  <li className="flex items-center gap-2 text-sm">
+                    <Check className="w-4 h-4 text-success" />
+                    <span className="text-muted-foreground">Agentes ilimitados</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-sm">
+                    <Check className="w-4 h-4 text-success" />
+                    <span className="text-muted-foreground">Mensagens ilimitadas</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-sm">
+                    <Check className="w-4 h-4 text-success" />
+                    <span className="text-muted-foreground">Suporte Prioritário 24/7</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-sm">
+                    <Check className="w-4 h-4 text-success" />
+                    <span className="text-muted-foreground">SLA garantido</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-sm">
+                    <Check className="w-4 h-4 text-success" />
+                    <span className="text-muted-foreground">Onboarding dedicado</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-sm">
+                    <Check className="w-4 h-4 text-success" />
+                    <span className="text-muted-foreground">Customizações</span>
+                  </li>
+                </ul>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  disabled={tenant?.plan === 'enterprise'}
+                  onClick={() => toast({ title: "Contato", description: "Entre em contato com nossa equipe comercial." })}
+                >
+                  {tenant?.plan === 'enterprise' ? 'Plano Atual' : 'Falar com Vendas'}
+                </Button>
+              </GlassCard>
+            </div>
+
+            {/* FAQ */}
             <GlassCard className="p-6">
-              <h3 className="text-lg font-semibold text-foreground mb-4">Informações do Plano</h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
-                  <span className="text-muted-foreground">Máximo de Agentes</span>
-                  <span className="font-medium text-foreground">{tenant?.max_agents || 3}</span>
+              <h3 className="text-lg font-semibold text-foreground mb-4">Perguntas Frequentes</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h4 className="font-medium text-foreground mb-2">Posso mudar de plano?</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Sim, você pode fazer upgrade ou downgrade a qualquer momento. 
+                    As mudanças entram em vigor no próximo ciclo de faturamento.
+                  </p>
                 </div>
-                <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
-                  <span className="text-muted-foreground">Mensagens/Mês</span>
-                  <span className="font-medium text-foreground">{tenant?.max_messages_month || 1000}</span>
+                <div>
+                  <h4 className="font-medium text-foreground mb-2">Como funciona o limite de mensagens?</h4>
+                  <p className="text-sm text-muted-foreground">
+                    O limite é renovado todo mês. Mensagens não utilizadas não acumulam.
+                  </p>
                 </div>
-                <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
-                  <span className="text-muted-foreground">Suporte</span>
-                  <span className="font-medium text-foreground">
-                    {tenant?.plan === "enterprise" ? "Prioritário 24/7" : tenant?.plan === "pro" ? "Email + Chat" : "Comunidade"}
-                  </span>
+                <div>
+                  <h4 className="font-medium text-foreground mb-2">Posso cancelar?</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Sim, você pode cancelar a qualquer momento sem custos adicionais.
+                  </p>
+                </div>
+                <div>
+                  <h4 className="font-medium text-foreground mb-2">Existe período de teste?</h4>
+                  <p className="text-sm text-muted-foreground">
+                    O plano Starter é gratuito para sempre. Experimente antes de fazer upgrade.
+                  </p>
                 </div>
               </div>
             </GlassCard>
