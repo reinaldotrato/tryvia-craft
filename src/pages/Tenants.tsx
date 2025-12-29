@@ -108,8 +108,9 @@ export default function Tenants() {
   const loadTenants = async () => {
     setLoading(true);
     try {
+      // Use secure view for reading (hides sensitive fields from non-admins)
       const { data, error } = await supabase
-        .from("tenants")
+        .from("tenants_secure")
         .select("*")
         .order("created_at", { ascending: false });
 
@@ -127,8 +128,9 @@ export default function Tenants() {
               .from("agents")
               .select("id", { count: "exact", head: true })
               .eq("tenant_id", tenant.id),
+            // Use secure view for reading conversations (masks phone numbers)
             supabase
-              .from("conversations")
+              .from("conversations_secure")
               .select("id", { count: "exact", head: true })
               .eq("tenant_id", tenant.id),
           ]);

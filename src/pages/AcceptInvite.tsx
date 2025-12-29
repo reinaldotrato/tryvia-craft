@@ -38,7 +38,8 @@ export default function AcceptInvite() {
     if (!token || !user) return;
 
     try {
-      // Get invitation details
+      // Get invitation details - use base table here since we need the token for validation
+      // The token is only exposed because the user already has it from the URL
       const { data: invitation, error: inviteError } = await supabase
         .from("invitations")
         .select("*, tenants(name)")
