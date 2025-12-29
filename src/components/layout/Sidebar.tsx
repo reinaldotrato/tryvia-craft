@@ -15,6 +15,7 @@ import {
   Activity,
   Shield,
   Plug,
+  Crown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -61,12 +62,19 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
-  const { hasPermission, role } = usePermissions();
+  const { hasPermission, role, isSuperAdmin } = usePermissions();
 
   // Filtra itens de navegação baseado nas permissões do usuário
   const navItems = allNavItems.filter(item => 
     !item.permission || hasPermission(item.permission)
   );
+
+  // Super Admin nav item (only visible to super admins)
+  const superAdminItem: NavItem = {
+    icon: Crown,
+    label: "Super Admin",
+    path: "/super-admin",
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -122,6 +130,45 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
+        {/* Super Admin link - only visible to super admins */}
+        {isSuperAdmin && (
+          <Link
+            to={superAdminItem.path}
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200",
+              "group relative mb-2",
+              location.pathname === superAdminItem.path
+                ? "bg-gradient-to-r from-amber-500/20 to-orange-500/10 text-foreground"
+                : "text-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
+            )}
+          >
+            {location.pathname === superAdminItem.path && (
+              <motion.div
+                layoutId="activeIndicator"
+                className="absolute left-0 w-1 h-6 bg-gradient-to-b from-amber-500 to-orange-500 rounded-r-full"
+              />
+            )}
+            <Crown
+              className={cn(
+                "w-5 h-5 shrink-0 transition-colors",
+                location.pathname === superAdminItem.path ? "text-amber-500" : "group-hover:text-amber-400"
+              )}
+            />
+            <AnimatePresence mode="wait">
+              {!collapsed && (
+                <motion.span
+                  className="text-sm font-medium whitespace-nowrap"
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: "auto" }}
+                  exit={{ opacity: 0, width: 0 }}
+                >
+                  {superAdminItem.label}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </Link>
+        )}
+        
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           return (
