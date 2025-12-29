@@ -6,37 +6,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useProfile } from "@/contexts/ProfileContext";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
 export default function Profile() {
   const { user } = useAuth();
+  const { refreshProfile, fullName: profileFullName, avatarUrl: profileAvatarUrl } = useProfile();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [fullName, setFullName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
+  // Sync with profile context on mount
   useEffect(() => {
-    if (user) {
-      loadProfile();
-    }
-  }, [user]);
-
-  const loadProfile = async () => {
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("full_name, avatar_url")
-      .eq("id", user.id)
-      .single();
-
-    if (data) {
-      setFullName(data.full_name || "");
-      setAvatarUrl(data.avatar_url);
-    }
-  };
+    setFullName(profileFullName);
+    setAvatarUrl(profileAvatarUrl);
+  }, [profileFullName, profileAvatarUrl]);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -89,6 +76,9 @@ export default function Profile() {
 
       if (updateError) throw updateError;
 
+      // Refresh profile context so Sidebar updates
+      await refreshProfile();
+
       toast({
         title: "Sucesso",
         description: "Avatar atualizado com sucesso!",
@@ -121,6 +111,9 @@ export default function Profile() {
       await supabase.auth.updateUser({
         data: { full_name: fullName },
       });
+
+      // Refresh profile context so Sidebar updates
+      await refreshProfile();
 
       toast({
         title: "Sucesso",
