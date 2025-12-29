@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, forwardRef } from "react";
 import { motion } from "framer-motion";
 import {
   Shield,
@@ -120,7 +120,7 @@ const roleLabels: Record<AppRole, string> = {
   viewer: "Visualizador",
 };
 
-export default function UserPermissions() {
+const UserPermissions = forwardRef<HTMLDivElement>((_, ref) => {
   const { toast } = useToast();
   const { tenantId, isOwner, isAdmin } = usePermissions();
   const [loading, setLoading] = useState(true);
@@ -453,4 +453,6 @@ export default function UserPermissions() {
       </Dialog>
     </div>
   );
-}
+});
+
+export default UserPermissions;
