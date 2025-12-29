@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Search, Bell, Command } from "lucide-react";
 import { Sidebar } from "./Sidebar";
@@ -10,6 +10,7 @@ import { useInvitationNotifications } from "@/hooks/useInvitationNotifications";
 
 export function AppLayout() {
   useInvitationNotifications();
+  const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
@@ -50,7 +51,12 @@ export function AppLayout() {
             {/* Right Actions */}
             <div className="flex items-center gap-2">
               <ThemeToggle />
-              <Button variant="ghost" size="icon" className="relative">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="relative"
+                onClick={() => navigate("/notifications")}
+              >
                 <Bell className="w-5 h-5" />
                 <span className="absolute top-2 right-2 w-2 h-2 bg-pink rounded-full" />
               </Button>
