@@ -18,6 +18,7 @@ import Profile from "./pages/Profile";
 import Tenants from "./pages/Tenants";
 import Team from "./pages/Team";
 import AcceptInvite from "./pages/AcceptInvite";
+import Notifications from "./pages/Notifications";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -65,6 +66,7 @@ const AppRoutes = () => (
       <Route path="/profile" element={<Profile />} />
       <Route path="/tenants" element={<Tenants />} />
       <Route path="/team" element={<Team />} />
+      <Route path="/notifications" element={<Notifications />} />
     </Route>
     
     {/* Redirects */}

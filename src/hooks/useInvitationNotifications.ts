@@ -19,19 +19,49 @@ export function useInvitationNotifications() {
           schema: 'public',
           table: 'invitations',
         },
-        (payload) => {
+        async (payload) => {
           const newData = payload.new as {
             status: string;
             email: string;
             accepted_at: string | null;
+            tenant_id: string;
           };
           
           if (newData.status === 'accepted' && newData.accepted_at) {
+            // Show toast notification
             toast({
               title: 'Convite aceito! 🎉',
               description: `${newData.email} aceitou o convite e entrou na equipe.`,
             });
+
+            // Save to notifications table
+            await supabase.from('notifications').insert({
+              tenant_id: newData.tenant_id,
+              title: 'Novo membro na equipe',
+              message: `${newData.email} aceitou o convite e entrou na equipe.`,
+              type: 'invite_accepted',
+              metadata: { email: newData.email },
+            });
           }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+        },
+        (payload) => {
+          const notification = payload.new as {
+            title: string;
+            message: string;
+          };
+          
+          toast({
+            title: notification.title,
+            description: notification.message,
+          });
         }
       )
       .subscribe();
