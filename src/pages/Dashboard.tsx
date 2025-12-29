@@ -8,6 +8,8 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import zapiLogo from "@/assets/zapi-logo.jpeg";
+import n8nLogo from "@/assets/n8n-logo.png";
 import {
   AreaChart,
   Area,
@@ -417,8 +419,8 @@ export default function Dashboard() {
           <div className="space-y-4">
             <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-success/20 flex items-center justify-center">
-                  <span className="text-lg">📱</span>
+                <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center">
+                  <img src={zapiLogo} alt="Z-API" className="w-full h-full object-cover" />
                 </div>
                 <div>
                   <p className="font-medium text-foreground">Z-API</p>
@@ -430,8 +432,8 @@ export default function Dashboard() {
 
             <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-warning/20 flex items-center justify-center">
-                  <span className="text-lg">⚡</span>
+                <div className="w-10 h-10 rounded-lg bg-[#EA4B71]/20 flex items-center justify-center p-1.5">
+                  <img src={n8nLogo} alt="N8N" className="w-full h-full object-contain" />
                 </div>
                 <div>
                   <p className="font-medium text-foreground">N8N</p>
