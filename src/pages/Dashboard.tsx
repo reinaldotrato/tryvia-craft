@@ -89,9 +89,10 @@ export default function Dashboard() {
         agentsWithStatsRes,
       ] = await Promise.all([
         supabase.from("agents").select("id, status").eq("tenant_id", tenantId),
-        supabase.from("conversations").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+        // Use secure view for conversations (masks phone numbers for non-admins)
+        supabase.from("conversations_secure").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
         supabase
-          .from("conversations")
+          .from("conversations_secure")
           .select("id", { count: "exact", head: true })
           .eq("tenant_id", tenantId)
           .gte("created_at", new Date().toISOString().split("T")[0]),
@@ -101,7 +102,7 @@ export default function Dashboard() {
           .eq("tenant_id", tenantId)
           .eq("status", "active"),
         supabase
-          .from("conversations")
+          .from("conversations_secure")
           .select("id, contact_name, phone, last_message_at, status, agents(name)")
           .eq("tenant_id", tenantId)
           .order("last_message_at", { ascending: false })

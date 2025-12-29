@@ -131,9 +131,9 @@ export default function Analytics() {
 
       setAgents(agentsData || []);
 
-      // Build query filters
+      // Build query filters - use secure view (masks phone for non-admins)
       let conversationsQuery = supabase
-        .from("conversations")
+        .from("conversations_secure")
         .select("id, created_at, status, sentiment, agent_id")
         .eq("tenant_id", tenantId)
         .gte("created_at", start.toISOString())
