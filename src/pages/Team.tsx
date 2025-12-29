@@ -190,17 +190,50 @@ export default function Team() {
     setFormLoading(true);
 
     try {
-      // For now, show a message that invites need backend implementation
-      // In a real implementation, you'd call an edge function to send invite emails
+      // Get tenant info
+      const { data: tenantUser } = await supabase
+        .from("tenant_users")
+        .select("tenant_id, tenants(name)")
+        .eq("user_id", user?.id)
+        .eq("status", "active")
+        .single();
+
+      if (!tenantUser) throw new Error("Tenant não encontrado");
+
+      // Get inviter name
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user?.id)
+        .single();
+
+      const inviterName = profile?.full_name || user?.email || "Alguém";
+      const tenantName = (tenantUser.tenants as any)?.name || "Workspace";
+
+      // Call edge function to send invite
+      const { data, error } = await supabase.functions.invoke("send-invite", {
+        body: {
+          email: inviteEmail,
+          role: inviteRole,
+          tenantId: tenantUser.tenant_id,
+          tenantName,
+          inviterName,
+        },
+      });
+
+      if (error) throw error;
+
       toast({
-        title: "Funcionalidade em desenvolvimento",
-        description: "O sistema de convites requer configuração de email. Por enquanto, adicione usuários diretamente após eles se cadastrarem.",
+        title: "Convite enviado!",
+        description: `Um email foi enviado para ${inviteEmail}.`,
       });
 
       setIsInviteDialogOpen(false);
       setInviteEmail("");
       setInviteRole("member");
+      loadTeamMembers();
     } catch (error: any) {
+      console.error("Invite error:", error);
       toast({
         title: "Erro",
         description: error.message || "Erro ao enviar convite.",
