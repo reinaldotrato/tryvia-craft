@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect } from "react";
 import {
   LayoutDashboard,
   Bot,
@@ -7,6 +8,7 @@ import {
   BarChart3,
   Settings,
   ChevronLeft,
+  ChevronDown,
   LogOut,
   User,
   Sparkles,
@@ -16,6 +18,7 @@ import {
   Shield,
   Plug,
   Crown,
+  Key,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -26,8 +29,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Permission } from "@/types/permissions";
 import tryviaLogo from "@/assets/tryvia-logo.png";
 
@@ -37,21 +46,8 @@ interface NavItem {
   path: string;
   badge?: number;
   permission?: Permission;
+  children?: NavItem[];
 }
-
-const allNavItems: NavItem[] = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-  { icon: Bot, label: "Agentes", path: "/agents", badge: 3, permission: "agents.view" },
-  { icon: MessageSquare, label: "Conversas", path: "/conversations", badge: 12, permission: "conversations.view" },
-  { icon: Users, label: "Equipe", path: "/team", permission: "team.view" },
-  { icon: Building2, label: "Clientes", path: "/tenants", permission: "settings.view" },
-  { icon: BarChart3, label: "Analytics", path: "/analytics", permission: "analytics.view" },
-  { icon: Plug, label: "Integrações", path: "/integrations", permission: "settings.view" },
-  { icon: Activity, label: "Logs", path: "/activity-logs", permission: "activity_logs.view" },
-  { icon: Shield, label: "Segurança", path: "/security", permission: "security.view" },
-  { icon: Shield, label: "Permissões", path: "/user-permissions", permission: "team.manage" },
-  { icon: Settings, label: "Configurações", path: "/settings", permission: "settings.view" },
-];
 
 interface SidebarProps {
   collapsed: boolean;
@@ -62,12 +58,61 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
-  const { hasPermission, role, isSuperAdmin } = usePermissions();
+  const { hasPermission, role, isSuperAdmin, tenantId } = usePermissions();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [conversationCount, setConversationCount] = useState(0);
+  const [agentCount, setAgentCount] = useState(0);
 
-  // Filtra itens de navegação baseado nas permissões do usuário
-  const navItems = allNavItems.filter(item => 
-    !item.permission || hasPermission(item.permission)
-  );
+  // Load real counts
+  useEffect(() => {
+    if (tenantId) {
+      loadCounts();
+    }
+  }, [tenantId]);
+
+  const loadCounts = async () => {
+    if (!tenantId) return;
+
+    try {
+      // Count active conversations
+      const { count: convCount } = await supabase
+        .from("conversations")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .eq("status", "active");
+
+      setConversationCount(convCount || 0);
+
+      // Count agents
+      const { count: agCount } = await supabase
+        .from("agents")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId);
+
+      setAgentCount(agCount || 0);
+    } catch (error) {
+      console.error("Error loading counts:", error);
+    }
+  };
+
+  // Main navigation items (without settings submenu items)
+  const mainNavItems: NavItem[] = [
+    { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+    { icon: Bot, label: "Agentes", path: "/agents", badge: agentCount > 0 ? agentCount : undefined, permission: "agents.view" },
+    { icon: MessageSquare, label: "Conversas", path: "/conversations", badge: conversationCount > 0 ? conversationCount : undefined, permission: "conversations.view" },
+    { icon: Users, label: "Equipe", path: "/team", permission: "team.view" },
+    { icon: Building2, label: "Clientes", path: "/tenants", permission: "settings.view" },
+    { icon: BarChart3, label: "Analytics", path: "/analytics", permission: "analytics.view" },
+    { icon: Plug, label: "Integrações", path: "/integrations", permission: "settings.view" },
+  ];
+
+  // Settings submenu items
+  const settingsSubItems: NavItem[] = [
+    { icon: Settings, label: "Geral", path: "/settings", permission: "settings.view" },
+    { icon: Activity, label: "Logs", path: "/activity-logs", permission: "activity_logs.view" },
+    { icon: Shield, label: "Segurança", path: "/security", permission: "security.view" },
+    { icon: Key, label: "Permissões", path: "/user-permissions", permission: "team.manage" },
+  ];
 
   // Super Admin nav item (only visible to super admins)
   const superAdminItem: NavItem = {
@@ -75,6 +120,20 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     label: "Super Admin",
     path: "/super-admin",
   };
+
+  // Filter items based on permissions
+  const filteredMainItems = mainNavItems.filter(item => 
+    !item.permission || hasPermission(item.permission)
+  );
+
+  const filteredSettingsItems = settingsSubItems.filter(item =>
+    !item.permission || hasPermission(item.permission)
+  );
+
+  const hasSettingsAccess = filteredSettingsItems.length > 0;
+
+  // Check if any settings path is active
+  const isSettingsActive = settingsSubItems.some(item => location.pathname === item.path);
 
   const handleSignOut = async () => {
     await signOut();
@@ -85,9 +144,28 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     ? user.user_metadata.full_name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()
     : user?.email?.slice(0, 2).toUpperCase() || "??";
 
-  const userName = user?.user_metadata?.full_name || "Usuário";
-  const userEmail = user?.email || "";
-  const roleLabel = role ? { owner: "Proprietário", admin: "Administrador", member: "Membro", viewer: "Visualizador" }[role] : "";
+  // Get first and second name
+  const fullName = user?.user_metadata?.full_name || "Usuário";
+  const nameParts = fullName.split(" ");
+  const displayName = nameParts.length >= 2 
+    ? `${nameParts[0]} ${nameParts[1]}` 
+    : nameParts[0];
+
+  // Get role label
+  const getRoleLabel = () => {
+    if (isSuperAdmin) return "Super Admin";
+    if (!role) return "";
+    const roleLabels: Record<string, string> = {
+      owner: "Proprietário",
+      admin: "Administrador",
+      member: "Membro",
+      viewer: "Visualizador",
+    };
+    return roleLabels[role] || "";
+  };
+
+  const roleLabel = getRoleLabel();
+
   return (
     <motion.aside
       className={cn(
@@ -169,7 +247,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           </Link>
         )}
         
-        {navItems.map((item) => {
+        {/* Main nav items */}
+        {filteredMainItems.map((item) => {
           const isActive = location.pathname === item.path;
           return (
             <Link
@@ -207,7 +286,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   </motion.span>
                 )}
               </AnimatePresence>
-              {item.badge && !collapsed && (
+              {item.badge !== undefined && item.badge > 0 && !collapsed && (
                 <span className="ml-auto bg-purple/20 text-purple text-xs font-semibold px-2 py-0.5 rounded-full">
                   {item.badge}
                 </span>
@@ -215,6 +294,93 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             </Link>
           );
         })}
+
+        {/* Settings with submenu */}
+        {hasSettingsAccess && !collapsed && (
+          <Collapsible open={settingsOpen || isSettingsActive} onOpenChange={setSettingsOpen}>
+            <CollapsibleTrigger asChild>
+              <button
+                className={cn(
+                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200",
+                  "group relative",
+                  isSettingsActive
+                    ? "bg-gradient-to-r from-purple/20 to-pink/10 text-foreground"
+                    : "text-sidebar-foreground hover:text-foreground hover:bg-sidebar-accent"
+                )}
+              >
+                {isSettingsActive && (
+                  <motion.div
+                    className="absolute left-0 w-1 h-6 bg-gradient-to-b from-pink to-purple rounded-r-full"
+                  />
+                )}
+                <Settings
+                  className={cn(
+                    "w-5 h-5 shrink-0 transition-colors",
+                    isSettingsActive ? "text-purple" : "group-hover:text-purple"
+                  )}
+                />
+                <span className="text-sm font-medium whitespace-nowrap flex-1 text-left">
+                  Configurações
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "w-4 h-4 transition-transform",
+                    (settingsOpen || isSettingsActive) && "rotate-180"
+                  )}
+                />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pl-6 mt-1 space-y-1">
+              {filteredSettingsItems.map((item) => {
+                const isActive = location.pathname === item.path;
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200",
+                      "group",
+                      isActive
+                        ? "bg-purple/10 text-foreground"
+                        : "text-sidebar-foreground hover:text-foreground hover:bg-sidebar-accent"
+                    )}
+                  >
+                    <item.icon
+                      className={cn(
+                        "w-4 h-4 shrink-0 transition-colors",
+                        isActive ? "text-purple" : "group-hover:text-purple"
+                      )}
+                    />
+                    <span className="text-sm whitespace-nowrap">
+                      {item.label}
+                    </span>
+                  </Link>
+                );
+              })}
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+
+        {/* Collapsed settings link */}
+        {hasSettingsAccess && collapsed && (
+          <Link
+            to="/settings"
+            className={cn(
+              "flex items-center justify-center px-3 py-2.5 rounded-xl transition-all duration-200",
+              "group relative",
+              isSettingsActive
+                ? "bg-gradient-to-r from-purple/20 to-pink/10 text-foreground"
+                : "text-sidebar-foreground hover:text-foreground hover:bg-sidebar-accent"
+            )}
+          >
+            <Settings
+              className={cn(
+                "w-5 h-5 shrink-0 transition-colors",
+                isSettingsActive ? "text-purple" : "group-hover:text-purple"
+              )}
+            />
+          </Link>
+        )}
       </nav>
 
       {/* Plan Badge */}
@@ -271,10 +437,14 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                   >
-                    <p className="text-sm font-medium text-foreground">{userName}</p>
-                    <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
+                    <p className="text-sm font-medium text-foreground">{displayName}</p>
                     {roleLabel && (
-                      <span className="text-xs text-purple font-medium">{roleLabel}</span>
+                      <span className={cn(
+                        "text-xs font-medium",
+                        isSuperAdmin ? "text-amber-500" : "text-purple"
+                      )}>
+                        {roleLabel}
+                      </span>
                     )}
                   </motion.div>
                 )}
