@@ -23,6 +23,8 @@ import AcceptInvite from "./pages/AcceptInvite";
 import Notifications from "./pages/Notifications";
 import ActivityLogs from "./pages/ActivityLogs";
 import SecurityDashboard from "./pages/SecurityDashboard";
+import SuperAdminDashboard from "./pages/SuperAdminDashboard";
+import UserPermissions from "./pages/UserPermissions";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -73,6 +75,8 @@ const AppRoutes = () => (
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/activity-logs" element={<ActivityLogs />} />
         <Route path="/security" element={<SecurityDashboard />} />
+        <Route path="/super-admin" element={<SuperAdminDashboard />} />
+        <Route path="/user-permissions" element={<UserPermissions />} />
     </Route>
     
     {/* Redirects */}
