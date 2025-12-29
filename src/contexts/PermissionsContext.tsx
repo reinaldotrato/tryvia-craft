@@ -31,9 +31,14 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
           .select("tenant_id, role")
           .eq("user_id", user.id)
           .eq("status", "active")
-          .single();
+          .maybeSingle();
 
-        if (error) throw error;
+        if (error) {
+          console.error("Error fetching user role:", error);
+          setRole(null);
+          setTenantId(null);
+          return;
+        }
 
         setTenantId(data?.tenant_id || null);
         setRole(data?.role as AppRole || null);
