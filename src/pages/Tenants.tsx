@@ -276,6 +276,18 @@ export default function Tenants() {
 
     try {
       if (isSuperAdmin) {
+        // Verify session is valid before calling edge function
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError || !session) {
+          toast({
+            title: "Sessão expirada",
+            description: "Por favor, faça login novamente.",
+            variant: "destructive",
+          });
+          return;
+        }
+
         // Super admins use the edge function
         const { data, error } = await supabase.functions.invoke("manage-tenant", {
           body: {
@@ -344,6 +356,18 @@ export default function Tenants() {
 
     try {
       if (isSuperAdmin) {
+        // Verify session is valid before calling edge function
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError || !session) {
+          toast({
+            title: "Sessão expirada",
+            description: "Por favor, faça login novamente.",
+            variant: "destructive",
+          });
+          return;
+        }
+
         const { data, error } = await supabase.functions.invoke("manage-tenant", {
           body: {
             action: "delete",
