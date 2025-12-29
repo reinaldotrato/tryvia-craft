@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Save, Eye, EyeOff, CheckCircle, XCircle, Loader2, ExternalLink, AlertTriangle, RefreshCw, Trash2 } from "lucide-react";
+import { Save, Eye, EyeOff, CheckCircle, XCircle, Loader2, ExternalLink, AlertTriangle, RefreshCw, Trash2, Wifi, WifiOff } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +56,8 @@ export default function Integrations() {
   const [agentWebhooks, setAgentWebhooks] = useState<Record<string, string>>({});
   const [savingAgentId, setSavingAgentId] = useState<string | null>(null);
   const [refreshingLogs, setRefreshingLogs] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<"idle" | "success" | "error">("idle");
 
   useEffect(() => {
     if (tenantId) {
@@ -234,6 +236,68 @@ export default function Integrations() {
     setRefreshingLogs(false);
   };
 
+  const handleTestConnection = async () => {
+    if (!config.zapi_instance_id || !config.zapi_token) {
+      toast({
+        title: "Erro",
+        description: "Preencha o Instance ID e Token para testar",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTestingConnection(true);
+    setConnectionStatus("idle");
+
+    try {
+      // Z-API status endpoint
+      const response = await fetch(
+        `https://api.z-api.io/instances/${config.zapi_instance_id}/token/${config.zapi_token}/status`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const data = await response.json();
+      console.log("Z-API status response:", data);
+
+      if (response.ok && (data.connected === true || data.status === "connected")) {
+        setConnectionStatus("success");
+        toast({
+          title: "Conexão OK",
+          description: "Instância Z-API conectada ao WhatsApp",
+        });
+      } else if (response.ok && data.connected === false) {
+        setConnectionStatus("error");
+        toast({
+          title: "Instância desconectada",
+          description: data.reason || "A instância não está conectada ao WhatsApp",
+          variant: "destructive",
+        });
+      } else {
+        setConnectionStatus("error");
+        toast({
+          title: "Erro na conexão",
+          description: data.message || data.error || "Não foi possível verificar o status",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error testing connection:", error);
+      setConnectionStatus("error");
+      toast({
+        title: "Erro",
+        description: "Não foi possível conectar à API. Verifique as credenciais.",
+        variant: "destructive",
+      });
+    } finally {
+      setTestingConnection(false);
+    }
+  };
+
   const toggleSecret = (field: string) => {
     setShowSecrets(prev => ({ ...prev, [field]: !prev[field] }));
   };
@@ -373,6 +437,37 @@ export default function Integrations() {
                     URL para receber notificações do Z-API
                   </p>
                 </div>
+
+                {/* Test Connection Button */}
+                <Button
+                  variant="outline"
+                  onClick={handleTestConnection}
+                  disabled={testingConnection || !config.zapi_instance_id || !config.zapi_token}
+                  className={`w-full ${
+                    connectionStatus === "success" 
+                      ? "border-success text-success" 
+                      : connectionStatus === "error" 
+                        ? "border-destructive text-destructive" 
+                        : ""
+                  }`}
+                >
+                  {testingConnection ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : connectionStatus === "success" ? (
+                    <Wifi className="w-4 h-4 mr-2" />
+                  ) : connectionStatus === "error" ? (
+                    <WifiOff className="w-4 h-4 mr-2" />
+                  ) : (
+                    <Wifi className="w-4 h-4 mr-2" />
+                  )}
+                  {testingConnection 
+                    ? "Testando..." 
+                    : connectionStatus === "success" 
+                      ? "Conectado" 
+                      : connectionStatus === "error" 
+                        ? "Desconectado" 
+                        : "Testar Conexão"}
+                </Button>
               </div>
 
               {/* Connection Logs */}
