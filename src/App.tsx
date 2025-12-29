@@ -15,6 +15,7 @@ import Conversations from "./pages/Conversations";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import Profile from "./pages/Profile";
+import Tenants from "./pages/Tenants";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -59,6 +60,7 @@ const AppRoutes = () => (
       <Route path="/analytics" element={<Analytics />} />
       <Route path="/settings" element={<Settings />} />
       <Route path="/profile" element={<Profile />} />
+      <Route path="/tenants" element={<Tenants />} />
     </Route>
     
     {/* Redirects */}
