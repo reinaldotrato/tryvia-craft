@@ -11,6 +11,7 @@ import {
   User,
   Sparkles,
   Building2,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: Bot, label: "Agentes", path: "/agents", badge: 3 },
   { icon: MessageSquare, label: "Conversas", path: "/conversations", badge: 12 },
+  { icon: Users, label: "Equipe", path: "/team" },
   { icon: Building2, label: "Clientes", path: "/tenants" },
   { icon: BarChart3, label: "Analytics", path: "/analytics" },
   { icon: Settings, label: "Configurações", path: "/settings" },
