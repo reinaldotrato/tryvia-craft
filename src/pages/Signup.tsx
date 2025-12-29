@@ -6,10 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import tryviaLogo from "@/assets/tryvia-logo.png";
 
 export default function Signup() {
   const navigate = useNavigate();
+  const { signUp } = useAuth();
+  const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -20,14 +24,46 @@ export default function Signup() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (password !== confirmPassword) {
+      toast({
+        title: "Erro",
+        description: "As senhas não coincidem",
+        variant: "destructive",
+      });
       return;
     }
+
+    if (password.length < 6) {
+      toast({
+        title: "Erro",
+        description: "A senha deve ter pelo menos 6 caracteres",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
-    setTimeout(() => {
+
+    const { error } = await signUp(email, password, name);
+
+    if (error) {
+      toast({
+        title: "Erro ao criar conta",
+        description: error.message === "User already registered"
+          ? "Este email já está cadastrado"
+          : error.message,
+        variant: "destructive",
+      });
       setIsLoading(false);
-      navigate("/dashboard");
-    }, 1000);
+      return;
+    }
+
+    toast({
+      title: "Conta criada!",
+      description: "Verifique seu email para confirmar o cadastro.",
+    });
+    setIsLoading(false);
   };
 
   const passwordStrength = () => {
@@ -46,18 +82,12 @@ export default function Signup() {
       <div className="absolute inset-0 bg-background">
         <motion.div
           className="absolute top-1/3 left-1/3 w-96 h-96 bg-purple/30 rounded-full blur-[128px]"
-          animate={{
-            x: [0, 50, 0],
-            y: [0, -30, 0],
-          }}
+          animate={{ x: [0, 50, 0], y: [0, -30, 0] }}
           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
         />
         <motion.div
           className="absolute bottom-1/3 right-1/3 w-96 h-96 bg-pink/20 rounded-full blur-[128px]"
-          animate={{
-            x: [0, -40, 0],
-            y: [0, 40, 0],
-          }}
+          animate={{ x: [0, -40, 0], y: [0, 40, 0] }}
           transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
         />
       </div>
