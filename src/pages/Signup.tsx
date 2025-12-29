@@ -60,9 +60,13 @@ export default function Signup() {
     }
 
     toast({
-      title: "Conta criada!",
-      description: "Verifique seu email para confirmar o cadastro.",
+      title: "Conta criada com sucesso!",
+      description: "Bem-vindo ao Tryvia! Redirecionando...",
     });
+    
+    // Com auto-confirm habilitado, o usuário já está logado
+    // Redirecionar para o dashboard
+    navigate("/dashboard");
     setIsLoading(false);
   };
 
