@@ -48,6 +48,7 @@ const allNavItems: NavItem[] = [
   { icon: Plug, label: "Integrações", path: "/integrations", permission: "settings.view" },
   { icon: Activity, label: "Logs", path: "/activity-logs", permission: "activity_logs.view" },
   { icon: Shield, label: "Segurança", path: "/security", permission: "security.view" },
+  { icon: Shield, label: "Permissões", path: "/user-permissions", permission: "team.manage" },
   { icon: Settings, label: "Configurações", path: "/settings", permission: "settings.view" },
 ];
 

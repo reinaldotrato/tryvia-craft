@@ -14,14 +14,13 @@ import {
   Plus,
   Trash2,
   Loader2,
-  RefreshCw,
   Upload,
+  Camera,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -102,10 +101,10 @@ export default function Settings() {
   // Profile state
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileName, setProfileName] = useState("");
+  const [avatarUploading, setAvatarUploading] = useState(false);
   
   // Password state
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
@@ -213,6 +212,72 @@ export default function Settings() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    // Validate file
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Erro",
+        description: "Por favor, selecione uma imagem.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: "Erro",
+        description: "A imagem deve ter no máximo 2MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setAvatarUploading(true);
+
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${user.id}/avatar.${fileExt}`;
+
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(fileName);
+
+      // Update profile with avatar URL
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ avatar_url: urlData.publicUrl })
+        .eq("id", user.id);
+
+      if (updateError) throw updateError;
+
+      setProfile((prev) => prev ? { ...prev, avatar_url: urlData.publicUrl } : null);
+
+      toast({
+        title: "Sucesso",
+        description: "Avatar atualizado com sucesso!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao fazer upload do avatar.",
+        variant: "destructive",
+      });
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   const saveProfile = async () => {
     if (!user) return;
     setSaving(true);
@@ -274,7 +339,6 @@ export default function Settings() {
       });
       
       setShowPasswordDialog(false);
-      setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
     } catch (error: any) {
@@ -320,13 +384,11 @@ export default function Settings() {
     setGeneratingKey(true);
     
     try {
-      // Generate a random API key
       const keyBytes = new Uint8Array(32);
       crypto.getRandomValues(keyBytes);
       const fullKey = `tr_${Array.from(keyBytes).map(b => b.toString(16).padStart(2, '0')).join('')}`;
       const keyPrefix = fullKey.slice(0, 10);
       
-      // Hash the key for storage
       const encoder = new TextEncoder();
       const data = encoder.encode(fullKey);
       const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -447,14 +509,36 @@ export default function Settings() {
         <TabsContent value="profile">
           <GlassCard className="p-6 space-y-6">
             <div className="flex items-center gap-6">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple to-pink flex items-center justify-center text-primary-foreground font-bold text-2xl">
-                {profileName?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || "U"}
+              <div className="relative group">
+                {profile?.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt="Avatar"
+                    className="w-20 h-20 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple to-pink flex items-center justify-center text-primary-foreground font-bold text-2xl">
+                    {profileName?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || "U"}
+                  </div>
+                )}
+                <label className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                  {avatarUploading ? (
+                    <Loader2 className="w-6 h-6 text-white animate-spin" />
+                  ) : (
+                    <Camera className="w-6 h-6 text-white" />
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarUpload}
+                    disabled={avatarUploading}
+                  />
+                </label>
               </div>
               <div>
-                <Button variant="outline" size="sm">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Alterar foto
-                </Button>
+                <p className="text-sm text-muted-foreground mb-1">Clique na foto para alterar</p>
+                <p className="text-xs text-muted-foreground">JPG, PNG. Max 2MB.</p>
               </div>
             </div>
 
@@ -508,9 +592,7 @@ export default function Settings() {
                       onClick={changePassword}
                       disabled={changingPassword}
                     >
-                      {changingPassword ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : null}
+                      {changingPassword && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                       Alterar Senha
                     </Button>
                   </div>
@@ -520,11 +602,7 @@ export default function Settings() {
 
             <div className="flex justify-end">
               <Button onClick={saveProfile} disabled={saving}>
-                {saving ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4 mr-2" />
-                )}
+                {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                 Salvar Alterações
               </Button>
             </div>
@@ -578,11 +656,7 @@ export default function Settings() {
             {canManageSettings && (
               <div className="flex justify-end">
                 <Button onClick={saveTenant} disabled={saving}>
-                  {saving ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Save className="w-4 h-4 mr-2" />
-                  )}
+                  {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                   Salvar
                 </Button>
               </div>
@@ -688,9 +762,7 @@ export default function Settings() {
                           onClick={generateApiKey}
                           disabled={generatingKey || !newApiKeyName}
                         >
-                          {generatingKey ? (
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          ) : null}
+                          {generatingKey && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                           Gerar Chave
                         </Button>
                       </div>
@@ -847,7 +919,7 @@ export default function Settings() {
             <AlertDialogTitle>Revogar Chave de API</AlertDialogTitle>
             <AlertDialogDescription>
               Tem certeza que deseja revogar a chave "{keyToRevoke?.name}"? 
-              Esta ação não pode ser desfeita e todas as integrações usando esta chave deixarão de funcionar.
+              Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
