@@ -17,6 +17,7 @@ import Settings from "./pages/Settings";
 import Profile from "./pages/Profile";
 import Tenants from "./pages/Tenants";
 import Team from "./pages/Team";
+import AcceptInvite from "./pages/AcceptInvite";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +51,7 @@ const AppRoutes = () => (
     {/* Auth Routes */}
     <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
     <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
+    <Route path="/accept-invite" element={<AcceptInvite />} />
     
     {/* Protected App Routes */}
     <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>

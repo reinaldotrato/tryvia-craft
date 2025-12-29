@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Calendar, Bot, TrendingUp, MessageSquare, Zap, Users, Download } from "lucide-react";
+import { Calendar, Bot, TrendingUp, MessageSquare, Zap, Users, Download, Loader2 } from "lucide-react";
+import { format, subDays, startOfDay, endOfDay } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { KpiCard } from "@/components/ui/KpiCard";
@@ -11,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import {
   LineChart,
   Line,
@@ -26,66 +30,262 @@ import {
   Cell,
 } from "recharts";
 
-const conversationsData = [
-  { date: "01/12", conversations: 45 },
-  { date: "02/12", conversations: 52 },
-  { date: "03/12", conversations: 48 },
-  { date: "04/12", conversations: 61 },
-  { date: "05/12", conversations: 55 },
-  { date: "06/12", conversations: 67 },
-  { date: "07/12", conversations: 72 },
-];
+interface AnalyticsData {
+  totalConversations: number;
+  totalMessages: number;
+  tokensUsed: number;
+  avgResponseTime: number;
+  conversationsTrend: number;
+  messagesTrend: number;
+}
 
-const messagesPerAgent = [
-  { name: "Vendas IA", messages: 1240 },
-  { name: "Suporte 24h", messages: 956 },
-  { name: "Agendamento", messages: 420 },
-];
+interface AgentMetric {
+  id: string;
+  name: string;
+  conversations: number;
+  messages: number;
+  avgTime: string;
+  transfers: number;
+  successRate: string;
+}
 
-const sentimentData = [
-  { name: "Positivo", value: 65, color: "#10B981" },
-  { name: "Neutro", value: 25, color: "#64748B" },
-  { name: "Negativo", value: 10, color: "#EF4444" },
-];
+interface DailyData {
+  date: string;
+  conversations: number;
+  messages: number;
+}
 
-const peakHours = [
-  { hour: "09:00", count: 45 },
-  { hour: "10:00", count: 62 },
-  { hour: "11:00", count: 78 },
-  { hour: "14:00", count: 85 },
-  { hour: "15:00", count: 72 },
-];
-
-const agentMetrics = [
-  {
-    agent: "Vendas IA",
-    conversations: 125,
-    messages: 1240,
-    avgTime: "1.2s",
-    transfers: 8,
-    successRate: "94%",
-  },
-  {
-    agent: "Suporte 24h",
-    conversations: 89,
-    messages: 956,
-    avgTime: "0.8s",
-    transfers: 3,
-    successRate: "97%",
-  },
-  {
-    agent: "Agendamento",
-    conversations: 45,
-    messages: 420,
-    avgTime: "1.5s",
-    transfers: 2,
-    successRate: "91%",
-  },
-];
+interface SentimentData {
+  name: string;
+  value: number;
+  color: string;
+}
 
 export default function Analytics() {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState("7d");
   const [selectedAgent, setSelectedAgent] = useState("all");
+  const [agents, setAgents] = useState<{ id: string; name: string }[]>([]);
+  const [stats, setStats] = useState<AnalyticsData>({
+    totalConversations: 0,
+    totalMessages: 0,
+    tokensUsed: 0,
+    avgResponseTime: 0,
+    conversationsTrend: 0,
+    messagesTrend: 0,
+  });
+  const [dailyData, setDailyData] = useState<DailyData[]>([]);
+  const [agentMetrics, setAgentMetrics] = useState<AgentMetric[]>([]);
+  const [sentimentData, setSentimentData] = useState<SentimentData[]>([]);
+  const [messagesPerAgent, setMessagesPerAgent] = useState<{ name: string; messages: number }[]>([]);
+
+  useEffect(() => {
+    loadAnalytics();
+  }, [user, dateRange, selectedAgent]);
+
+  const getDateRange = () => {
+    const end = endOfDay(new Date());
+    let start: Date;
+
+    switch (dateRange) {
+      case "today":
+        start = startOfDay(new Date());
+        break;
+      case "7d":
+        start = startOfDay(subDays(new Date(), 7));
+        break;
+      case "30d":
+        start = startOfDay(subDays(new Date(), 30));
+        break;
+      default:
+        start = startOfDay(subDays(new Date(), 7));
+    }
+
+    return { start, end };
+  };
+
+  const loadAnalytics = async () => {
+    if (!user) return;
+    setLoading(true);
+
+    try {
+      // Get tenant
+      const { data: tenantUser } = await supabase
+        .from("tenant_users")
+        .select("tenant_id")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .single();
+
+      if (!tenantUser) throw new Error("Tenant not found");
+
+      const tenantId = tenantUser.tenant_id;
+      const { start, end } = getDateRange();
+
+      // Load agents for dropdown
+      const { data: agentsData } = await supabase
+        .from("agents")
+        .select("id, name")
+        .eq("tenant_id", tenantId);
+
+      setAgents(agentsData || []);
+
+      // Build query filters
+      let conversationsQuery = supabase
+        .from("conversations")
+        .select("id, created_at, status, sentiment, agent_id")
+        .eq("tenant_id", tenantId)
+        .gte("created_at", start.toISOString())
+        .lte("created_at", end.toISOString());
+
+      if (selectedAgent !== "all") {
+        conversationsQuery = conversationsQuery.eq("agent_id", selectedAgent);
+      }
+
+      const { data: conversations } = await conversationsQuery;
+
+      // Get analytics data
+      let analyticsQuery = supabase
+        .from("agent_analytics")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .gte("date", format(start, "yyyy-MM-dd"))
+        .lte("date", format(end, "yyyy-MM-dd"));
+
+      if (selectedAgent !== "all") {
+        analyticsQuery = analyticsQuery.eq("agent_id", selectedAgent);
+      }
+
+      const { data: analytics } = await analyticsQuery;
+
+      // Calculate totals
+      const totalConversations = conversations?.length || 0;
+      let totalMessages = 0;
+      let tokensUsed = 0;
+      let totalResponseTime = 0;
+      let responseTimeCount = 0;
+
+      (analytics || []).forEach((a) => {
+        totalMessages += (a.messages_sent || 0) + (a.messages_received || 0);
+        tokensUsed += a.tokens_used || 0;
+        if (a.avg_response_time_ms) {
+          totalResponseTime += a.avg_response_time_ms;
+          responseTimeCount++;
+        }
+      });
+
+      const avgResponseTime = responseTimeCount > 0 ? totalResponseTime / responseTimeCount : 0;
+
+      // Calculate sentiment distribution
+      const sentiments = { positive: 0, neutral: 0, negative: 0 };
+      (conversations || []).forEach((c) => {
+        if (c.sentiment === "positive") sentiments.positive++;
+        else if (c.sentiment === "negative") sentiments.negative++;
+        else sentiments.neutral++;
+      });
+
+      const totalSentiment = sentiments.positive + sentiments.neutral + sentiments.negative || 1;
+      setSentimentData([
+        { name: "Positivo", value: Math.round((sentiments.positive / totalSentiment) * 100), color: "#10B981" },
+        { name: "Neutro", value: Math.round((sentiments.neutral / totalSentiment) * 100), color: "#64748B" },
+        { name: "Negativo", value: Math.round((sentiments.negative / totalSentiment) * 100), color: "#EF4444" },
+      ]);
+
+      // Daily data for chart
+      const dailyMap = new Map<string, { conversations: number; messages: number }>();
+      const days = dateRange === "today" ? 1 : dateRange === "7d" ? 7 : 30;
+
+      for (let i = 0; i < days; i++) {
+        const date = format(subDays(new Date(), days - 1 - i), "dd/MM");
+        dailyMap.set(date, { conversations: 0, messages: 0 });
+      }
+
+      (conversations || []).forEach((c) => {
+        const date = format(new Date(c.created_at), "dd/MM");
+        const existing = dailyMap.get(date);
+        if (existing) {
+          existing.conversations++;
+        }
+      });
+
+      (analytics || []).forEach((a) => {
+        const date = format(new Date(a.date), "dd/MM");
+        const existing = dailyMap.get(date);
+        if (existing) {
+          existing.messages += (a.messages_sent || 0) + (a.messages_received || 0);
+        }
+      });
+
+      setDailyData(
+        Array.from(dailyMap.entries()).map(([date, data]) => ({
+          date,
+          ...data,
+        }))
+      );
+
+      // Agent metrics
+      const agentStatsMap = new Map<string, AgentMetric>();
+      (agentsData || []).forEach((agent) => {
+        agentStatsMap.set(agent.id, {
+          id: agent.id,
+          name: agent.name,
+          conversations: 0,
+          messages: 0,
+          avgTime: "0s",
+          transfers: 0,
+          successRate: "0%",
+        });
+      });
+
+      (conversations || []).forEach((c) => {
+        if (c.agent_id && agentStatsMap.has(c.agent_id)) {
+          const stats = agentStatsMap.get(c.agent_id)!;
+          stats.conversations++;
+        }
+      });
+
+      (analytics || []).forEach((a) => {
+        if (agentStatsMap.has(a.agent_id)) {
+          const stats = agentStatsMap.get(a.agent_id)!;
+          stats.messages += (a.messages_sent || 0) + (a.messages_received || 0);
+          stats.transfers += a.transfers_to_human || 0;
+          if (a.avg_response_time_ms) {
+            stats.avgTime = `${(a.avg_response_time_ms / 1000).toFixed(1)}s`;
+          }
+        }
+      });
+
+      const agentMetricsArray = Array.from(agentStatsMap.values());
+      setAgentMetrics(agentMetricsArray);
+      setMessagesPerAgent(
+        agentMetricsArray
+          .filter((a) => a.messages > 0)
+          .map((a) => ({ name: a.name, messages: a.messages }))
+      );
+
+      setStats({
+        totalConversations,
+        totalMessages,
+        tokensUsed,
+        avgResponseTime,
+        conversationsTrend: 12, // Would calculate from previous period
+        messagesTrend: 8,
+      });
+    } catch (error) {
+      console.error("Error loading analytics:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-purple" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -118,7 +318,6 @@ export default function Analytics() {
               <SelectItem value="today">Hoje</SelectItem>
               <SelectItem value="7d">Últimos 7 dias</SelectItem>
               <SelectItem value="30d">Últimos 30 dias</SelectItem>
-              <SelectItem value="custom">Personalizado</SelectItem>
             </SelectContent>
           </Select>
           <Select value={selectedAgent} onValueChange={setSelectedAgent}>
@@ -128,9 +327,11 @@ export default function Analytics() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os Agentes</SelectItem>
-              <SelectItem value="vendas">Vendas IA</SelectItem>
-              <SelectItem value="suporte">Suporte 24h</SelectItem>
-              <SelectItem value="agendamento">Agendamento</SelectItem>
+              {agents.map((agent) => (
+                <SelectItem key={agent.id} value={agent.id}>
+                  {agent.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Button variant="outline">
@@ -144,34 +345,32 @@ export default function Analytics() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           title="Total de Conversas"
-          value="259"
+          value={stats.totalConversations.toLocaleString()}
           icon={MessageSquare}
           color="purple"
-          trend={{ value: 15, isPositive: true }}
+          trend={{ value: stats.conversationsTrend, isPositive: true }}
           delay={0}
         />
         <KpiCard
           title="Total de Mensagens"
-          value="2.6k"
+          value={stats.totalMessages.toLocaleString()}
           icon={Zap}
           color="pink"
-          trend={{ value: 8, isPositive: true }}
+          trend={{ value: stats.messagesTrend, isPositive: true }}
           delay={0.1}
         />
         <KpiCard
           title="Tokens Utilizados"
-          value="125k"
+          value={stats.tokensUsed.toLocaleString()}
           icon={TrendingUp}
           color="cyan"
-          trend={{ value: 12, isPositive: false }}
           delay={0.2}
         />
         <KpiCard
-          title="Taxa de Resolução"
-          value="94%"
+          title="Tempo Médio Resposta"
+          value={`${(stats.avgResponseTime / 1000).toFixed(1)}s`}
           icon={Users}
           color="green"
-          trend={{ value: 3, isPositive: true }}
           delay={0.3}
         />
       </div>
@@ -185,14 +384,14 @@ export default function Analytics() {
           </h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={conversationsData}>
+              <LineChart data={dailyData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                 <XAxis dataKey="date" stroke="#64748B" fontSize={12} />
                 <YAxis stroke="#64748B" fontSize={12} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "rgba(26, 26, 46, 0.9)",
-                    border: "1px solid rgba(255,255,255,0.1)",
+                    backgroundColor: "hsl(var(--popover))",
+                    border: "1px solid hsl(var(--border))",
                     borderRadius: "8px",
                   }}
                 />
@@ -203,6 +402,7 @@ export default function Analytics() {
                   strokeWidth={2}
                   dot={{ fill: "#7C3AED", strokeWidth: 0 }}
                   activeDot={{ r: 6, fill: "#EC4899" }}
+                  name="Conversas"
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -215,31 +415,38 @@ export default function Analytics() {
             Mensagens por Agente
           </h3>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={messagesPerAgent}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                <XAxis dataKey="name" stroke="#64748B" fontSize={12} />
-                <YAxis stroke="#64748B" fontSize={12} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "rgba(26, 26, 46, 0.9)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: "8px",
-                  }}
-                />
-                <Bar
-                  dataKey="messages"
-                  fill="url(#colorGradient)"
-                  radius={[8, 8, 0, 0]}
-                />
-                <defs>
-                  <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#7C3AED" />
-                    <stop offset="100%" stopColor="#EC4899" />
-                  </linearGradient>
-                </defs>
-              </BarChart>
-            </ResponsiveContainer>
+            {messagesPerAgent.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={messagesPerAgent}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                  <XAxis dataKey="name" stroke="#64748B" fontSize={12} />
+                  <YAxis stroke="#64748B" fontSize={12} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--popover))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                    }}
+                  />
+                  <Bar
+                    dataKey="messages"
+                    fill="url(#colorGradient)"
+                    radius={[8, 8, 0, 0]}
+                    name="Mensagens"
+                  />
+                  <defs>
+                    <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#7C3AED" />
+                      <stop offset="100%" stopColor="#EC4899" />
+                    </linearGradient>
+                  </defs>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                Nenhum dado disponível
+              </div>
+            )}
           </div>
         </GlassCard>
       </div>
@@ -269,8 +476,8 @@ export default function Analytics() {
                 </Pie>
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "rgba(26, 26, 46, 0.9)",
-                    border: "1px solid rgba(255,255,255,0.1)",
+                    backgroundColor: "hsl(var(--popover))",
+                    border: "1px solid hsl(var(--border))",
                     borderRadius: "8px",
                   }}
                 />
@@ -292,91 +499,65 @@ export default function Analytics() {
           </div>
         </GlassCard>
 
-        {/* Peak Hours */}
+        {/* Agent Performance Table */}
         <GlassCard className="p-6 lg:col-span-2">
           <h3 className="text-lg font-semibold text-foreground mb-4">
-            Horários de Pico
+            Métricas por Agente
           </h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={peakHours} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                <XAxis type="number" stroke="#64748B" fontSize={12} />
-                <YAxis dataKey="hour" type="category" stroke="#64748B" fontSize={12} width={60} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "rgba(26, 26, 46, 0.9)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: "8px",
-                  }}
-                />
-                <Bar
-                  dataKey="count"
-                  fill="#06B6D4"
-                  radius={[0, 8, 8, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground">
+                    Agente
+                  </th>
+                  <th className="text-right py-3 px-4 text-sm font-semibold text-muted-foreground">
+                    Conversas
+                  </th>
+                  <th className="text-right py-3 px-4 text-sm font-semibold text-muted-foreground">
+                    Mensagens
+                  </th>
+                  <th className="text-right py-3 px-4 text-sm font-semibold text-muted-foreground">
+                    Tempo Médio
+                  </th>
+                  <th className="text-right py-3 px-4 text-sm font-semibold text-muted-foreground">
+                    Transferências
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {agentMetrics.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                      Nenhum agente encontrado
+                    </td>
+                  </tr>
+                ) : (
+                  agentMetrics.map((metric) => (
+                    <tr
+                      key={metric.id}
+                      className="border-b border-border/50 hover:bg-muted/50 transition-colors"
+                    >
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple to-pink flex items-center justify-center">
+                            <Bot className="w-4 h-4 text-primary-foreground" />
+                          </div>
+                          <span className="font-medium text-foreground">{metric.name}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-right text-foreground">{metric.conversations}</td>
+                      <td className="py-3 px-4 text-right text-foreground">{metric.messages}</td>
+                      <td className="py-3 px-4 text-right text-foreground">{metric.avgTime}</td>
+                      <td className="py-3 px-4 text-right text-foreground">{metric.transfers}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </GlassCard>
       </div>
-
-      {/* Detailed Table */}
-      <GlassCard className="p-6">
-        <h3 className="text-lg font-semibold text-foreground mb-4">
-          Métricas por Agente
-        </h3>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-white/10">
-                <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground">
-                  Agente
-                </th>
-                <th className="text-right py-3 px-4 text-sm font-semibold text-muted-foreground">
-                  Conversas
-                </th>
-                <th className="text-right py-3 px-4 text-sm font-semibold text-muted-foreground">
-                  Mensagens
-                </th>
-                <th className="text-right py-3 px-4 text-sm font-semibold text-muted-foreground">
-                  Tempo Médio
-                </th>
-                <th className="text-right py-3 px-4 text-sm font-semibold text-muted-foreground">
-                  Transferências
-                </th>
-                <th className="text-right py-3 px-4 text-sm font-semibold text-muted-foreground">
-                  Taxa Sucesso
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {agentMetrics.map((metric) => (
-                <tr
-                  key={metric.agent}
-                  className="border-b border-white/5 hover:bg-white/5 transition-colors"
-                >
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple to-pink flex items-center justify-center">
-                        <Bot className="w-4 h-4 text-primary-foreground" />
-                      </div>
-                      <span className="font-medium text-foreground">{metric.agent}</span>
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 text-right text-foreground">{metric.conversations}</td>
-                  <td className="py-3 px-4 text-right text-foreground">{metric.messages}</td>
-                  <td className="py-3 px-4 text-right text-foreground">{metric.avgTime}</td>
-                  <td className="py-3 px-4 text-right text-foreground">{metric.transfers}</td>
-                  <td className="py-3 px-4 text-right">
-                    <span className="text-success font-semibold">{metric.successRate}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </GlassCard>
     </div>
   );
 }
