@@ -13,6 +13,7 @@ import AgentForm from "./pages/AgentForm";
 import Conversations from "./pages/Conversations";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -56,6 +57,7 @@ const AppRoutes = () => (
       <Route path="/conversations" element={<Conversations />} />
       <Route path="/analytics" element={<Analytics />} />
       <Route path="/settings" element={<Settings />} />
+      <Route path="/profile" element={<Profile />} />
     </Route>
     
     {/* Redirects */}
