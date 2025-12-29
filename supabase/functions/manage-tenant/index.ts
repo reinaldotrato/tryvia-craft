@@ -39,7 +39,11 @@ serve(async (req) => {
     // Create user client to verify caller is super admin
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      throw new Error("Missing authorization header");
+      console.error("Missing authorization header");
+      return new Response(
+        JSON.stringify({ error: "Missing authorization header" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
@@ -49,8 +53,14 @@ serve(async (req) => {
     // Get current user
     const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
     if (userError || !user) {
-      throw new Error("Unauthorized: Invalid token");
+      console.error("Invalid token or user not found:", userError?.message);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized: Invalid or expired token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
+
+    console.log("Authenticated user:", user.id, user.email);
 
     // Check if user is super admin
     const { data: superAdmin, error: saError } = await supabaseAdmin
@@ -61,12 +71,21 @@ serve(async (req) => {
 
     if (saError) {
       console.error("Error checking super admin:", saError);
-      throw new Error("Error verifying permissions");
+      return new Response(
+        JSON.stringify({ error: "Error verifying permissions" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     if (!superAdmin) {
-      throw new Error("Forbidden: Only super admins can manage tenants");
+      console.error("User is not a super admin:", user.id);
+      return new Response(
+        JSON.stringify({ error: "Forbidden: Only super admins can manage tenants" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
+
+    console.log("Super admin verified:", user.id);
 
     const body: CreateTenantRequest = await req.json();
     console.log("Request body:", JSON.stringify(body, null, 2));
