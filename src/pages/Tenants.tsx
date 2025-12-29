@@ -13,6 +13,11 @@ import {
   Loader2,
   Crown,
   Mail,
+  UserPlus,
+  Shield,
+  Eye,
+  ChevronRight,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +35,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
   Select,
@@ -48,11 +54,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { cn } from "@/lib/utils";
+import { Database } from "@/integrations/supabase/types";
+
+type AppRole = Database["public"]["Enums"]["app_role"];
 
 interface Tenant {
   id: string;
@@ -71,6 +87,17 @@ interface Tenant {
   };
 }
 
+interface TenantMember {
+  id: string;
+  user_id: string;
+  role: AppRole;
+  status: string;
+  profile?: {
+    full_name: string | null;
+    avatar_url: string | null;
+  };
+}
+
 const planColors: Record<string, string> = {
   starter: "bg-muted text-muted-foreground",
   pro: "bg-purple/20 text-purple",
@@ -83,6 +110,20 @@ const statusColors: Record<string, string> = {
   suspended: "bg-destructive/20 text-destructive",
 };
 
+const roleLabels: Record<AppRole, string> = {
+  owner: "Proprietário",
+  admin: "Administrador",
+  member: "Membro",
+  viewer: "Visualizador",
+};
+
+const roleColors: Record<AppRole, string> = {
+  owner: "bg-pink/20 text-pink",
+  admin: "bg-purple/20 text-purple",
+  member: "bg-cyan/20 text-cyan",
+  viewer: "bg-muted text-muted-foreground",
+};
+
 export default function Tenants() {
   const { toast } = useToast();
   const { isSuperAdmin } = usePermissions();
@@ -93,6 +134,16 @@ export default function Tenants() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [formLoading, setFormLoading] = useState(false);
+  
+  // Team management state
+  const [isTeamSheetOpen, setIsTeamSheetOpen] = useState(false);
+  const [teamTenant, setTeamTenant] = useState<Tenant | null>(null);
+  const [teamMembers, setTeamMembers] = useState<TenantMember[]>([]);
+  const [teamLoading, setTeamLoading] = useState(false);
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<AppRole>("member");
+  const [inviteLoading, setInviteLoading] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -325,6 +376,127 @@ export default function Tenants() {
     }
   };
 
+  const openTeamSheet = async (tenant: Tenant) => {
+    setTeamTenant(tenant);
+    setIsTeamSheetOpen(true);
+    setTeamLoading(true);
+    
+    try {
+      // Load team members for this tenant
+      const { data: membersData, error: membersError } = await supabase
+        .from("tenant_users")
+        .select("*")
+        .eq("tenant_id", tenant.id)
+        .order("created_at", { ascending: true });
+
+      if (membersError) throw membersError;
+
+      // Get profiles for all members
+      const userIds = membersData.map((m) => m.user_id);
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name, avatar_url")
+        .in("id", userIds);
+
+      // Merge profiles with members
+      const membersWithProfiles = membersData.map((member) => ({
+        ...member,
+        profile: profiles?.find((p) => p.id === member.user_id) || null,
+      }));
+
+      setTeamMembers(membersWithProfiles);
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao carregar membros.",
+        variant: "destructive",
+      });
+    } finally {
+      setTeamLoading(false);
+    }
+  };
+
+  const handleInviteMember = async () => {
+    if (!inviteEmail || !teamTenant) {
+      toast({
+        title: "Erro",
+        description: "Por favor, insira um email.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setInviteLoading(true);
+
+    try {
+      // Check if user already exists
+      const { data: authUsers } = await supabase.auth.admin?.listUsers?.() || { data: null };
+      
+      // Create invitation
+      const token = crypto.randomUUID();
+      const { error: inviteError } = await supabase
+        .from("invitations")
+        .insert({
+          tenant_id: teamTenant.id,
+          email: inviteEmail,
+          role: inviteRole,
+          token,
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        });
+
+      if (inviteError) throw inviteError;
+
+      toast({
+        title: "Convite criado!",
+        description: `Convite enviado para ${inviteEmail}.`,
+      });
+
+      setIsInviteDialogOpen(false);
+      setInviteEmail("");
+      setInviteRole("member");
+      
+      // Reload team
+      if (teamTenant) {
+        openTeamSheet(teamTenant);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao enviar convite.",
+        variant: "destructive",
+      });
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  const handleRemoveMember = async (memberId: string) => {
+    try {
+      const { error } = await supabase
+        .from("tenant_users")
+        .delete()
+        .eq("id", memberId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Membro removido com sucesso!",
+      });
+
+      // Reload team
+      if (teamTenant) {
+        openTeamSheet(teamTenant);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao remover membro.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const filteredTenants = tenants.filter(
     (tenant) =>
       tenant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -441,6 +613,11 @@ export default function Tenants() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openTeamSheet(tenant)}>
+                        <Users className="w-4 h-4 mr-2" />
+                        Gerenciar Equipe
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => openEditDialog(tenant)}>
                         <Edit2 className="w-4 h-4 mr-2" />
                         Editar
@@ -662,6 +839,133 @@ export default function Tenants() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Team Management Sheet */}
+      <Sheet open={isTeamSheetOpen} onOpenChange={setIsTeamSheetOpen}>
+        <SheetContent className="w-full sm:max-w-lg">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              Equipe - {teamTenant?.name}
+            </SheetTitle>
+            <SheetDescription>
+              Gerencie os membros da equipe deste cliente
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-6 space-y-4">
+            {/* Add Member Button */}
+            <Button 
+              onClick={() => setIsInviteDialogOpen(true)} 
+              className="w-full bg-gradient-to-r from-purple to-pink hover:opacity-90"
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              Convidar Membro
+            </Button>
+
+            {/* Members List */}
+            {teamLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-purple" />
+              </div>
+            ) : teamMembers.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>Nenhum membro na equipe.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {teamMembers.map((member) => (
+                  <div
+                    key={member.id}
+                    className="flex items-center justify-between p-4 rounded-lg bg-muted/50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple to-pink flex items-center justify-center text-primary-foreground font-bold">
+                        {member.profile?.full_name?.charAt(0)?.toUpperCase() || "?"}
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">
+                          {member.profile?.full_name || "Usuário"}
+                        </p>
+                        <Badge className={cn("font-medium text-xs", roleColors[member.role])}>
+                          {roleLabels[member.role]}
+                        </Badge>
+                      </div>
+                    </div>
+                    {member.role !== "owner" && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveMember(member.id)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Invite Member Dialog */}
+      <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Convidar Membro</DialogTitle>
+            <DialogDescription>
+              Envie um convite para um novo membro da equipe
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="inviteEmail">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="inviteEmail"
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="email@empresa.com"
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Permissão</Label>
+              <Select
+                value={inviteRole}
+                onValueChange={(value) => setInviteRole(value as AppRole)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Administrador</SelectItem>
+                  <SelectItem value="member">Membro</SelectItem>
+                  <SelectItem value="viewer">Visualizador</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsInviteDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleInviteMember} disabled={inviteLoading}>
+              {inviteLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Enviar Convite
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
