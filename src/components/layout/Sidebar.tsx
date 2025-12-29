@@ -14,6 +14,7 @@ import {
   Users,
   Activity,
   Shield,
+  Plug,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ const allNavItems: NavItem[] = [
   { icon: Users, label: "Equipe", path: "/team", permission: "team.view" },
   { icon: Building2, label: "Clientes", path: "/tenants", permission: "settings.view" },
   { icon: BarChart3, label: "Analytics", path: "/analytics", permission: "analytics.view" },
+  { icon: Plug, label: "Integrações", path: "/integrations", permission: "settings.view" },
   { icon: Activity, label: "Logs", path: "/activity-logs", permission: "activity_logs.view" },
   { icon: Shield, label: "Segurança", path: "/security", permission: "security.view" },
   { icon: Settings, label: "Configurações", path: "/settings", permission: "settings.view" },

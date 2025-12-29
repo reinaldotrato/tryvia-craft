@@ -443,8 +443,8 @@ export default function Dashboard() {
               <StatusBadge status="active" />
             </div>
 
-            <Button variant="outline" className="w-full mt-4">
-              Configurar Integrações
+            <Button variant="outline" className="w-full mt-4" asChild>
+              <Link to="/integrations">Configurar Integrações</Link>
             </Button>
           </div>
         </GlassCard>
