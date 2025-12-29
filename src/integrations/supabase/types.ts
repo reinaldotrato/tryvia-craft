@@ -616,6 +616,24 @@ export type Database = {
         }
         Relationships: []
       }
+      super_admins: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       tenant_users: {
         Row: {
           accepted_at: string | null
@@ -723,6 +741,48 @@ export type Database = {
           zapi_webhook_url?: string | null
         }
         Relationships: []
+      }
+      user_permissions: {
+        Row: {
+          created_at: string
+          granted_by: string | null
+          id: string
+          permission: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          permission: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          permission?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_permissions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_permissions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants_secure"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -1061,8 +1121,13 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_super_admin: { Args: never; Returns: boolean }
       is_tenant_admin: { Args: { p_tenant_id: string }; Returns: boolean }
       is_tenant_member: { Args: { p_tenant_id: string }; Returns: boolean }
+      user_has_permission: {
+        Args: { p_permission: string; p_user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "owner" | "admin" | "member" | "viewer"

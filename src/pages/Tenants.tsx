@@ -11,7 +11,8 @@ import {
   Bot,
   MessageSquare,
   Loader2,
-  X
+  Crown,
+  Mail,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +51,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { cn } from "@/lib/utils";
 
 interface Tenant {
@@ -83,6 +85,7 @@ const statusColors: Record<string, string> = {
 
 export default function Tenants() {
   const { toast } = useToast();
+  const { isSuperAdmin } = usePermissions();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -99,6 +102,7 @@ export default function Tenants() {
     status: "active",
     max_agents: 3,
     max_messages_month: 1000,
+    ownerEmail: "",
   });
 
   useEffect(() => {
@@ -108,7 +112,7 @@ export default function Tenants() {
   const loadTenants = async () => {
     setLoading(true);
     try {
-      // Use secure view for reading (hides sensitive fields from non-admins)
+      // Super admins can see all tenants, regular users see their own
       const { data, error } = await supabase
         .from("tenants_secure")
         .select("*")
@@ -128,7 +132,6 @@ export default function Tenants() {
               .from("agents")
               .select("id", { count: "exact", head: true })
               .eq("tenant_id", tenant.id),
-            // Use secure view for reading conversations (masks phone numbers)
             supabase
               .from("conversations_secure")
               .select("id", { count: "exact", head: true })
@@ -184,6 +187,7 @@ export default function Tenants() {
       status: "active",
       max_agents: 3,
       max_messages_month: 1000,
+      ownerEmail: "",
     });
     setIsDialogOpen(true);
   };
@@ -197,6 +201,7 @@ export default function Tenants() {
       status: tenant.status || "active",
       max_agents: tenant.max_agents || 3,
       max_messages_month: tenant.max_messages_month || 1000,
+      ownerEmail: "",
     });
     setIsDialogOpen(true);
   };
@@ -219,44 +224,53 @@ export default function Tenants() {
     setFormLoading(true);
 
     try {
-      if (selectedTenant) {
-        // Update
-        const { error } = await supabase
-          .from("tenants")
-          .update({
-            name: formData.name,
-            slug: formData.slug,
-            plan: formData.plan,
-            status: formData.status,
-            max_agents: formData.max_agents,
-            max_messages_month: formData.max_messages_month,
-          })
-          .eq("id", selectedTenant.id);
+      if (isSuperAdmin) {
+        // Super admins use the edge function
+        const { data, error } = await supabase.functions.invoke("manage-tenant", {
+          body: {
+            action: selectedTenant ? "update" : "create",
+            tenant_id: selectedTenant?.id,
+            tenant: {
+              name: formData.name,
+              slug: formData.slug,
+              plan: formData.plan,
+              status: formData.status,
+              max_agents: formData.max_agents,
+              max_messages_month: formData.max_messages_month,
+            },
+            owner: formData.ownerEmail ? { email: formData.ownerEmail } : undefined,
+          },
+        });
 
         if (error) throw error;
+        if (data?.error) throw new Error(data.error);
 
         toast({
           title: "Sucesso",
-          description: "Cliente atualizado com sucesso!",
+          description: selectedTenant ? "Cliente atualizado com sucesso!" : "Cliente criado com sucesso!",
         });
       } else {
-        // Create - Note: Creating tenants directly might not work due to RLS
-        // This would typically be done by a superadmin or via edge function
-        const { error } = await supabase.from("tenants").insert({
-          name: formData.name,
-          slug: formData.slug,
-          plan: formData.plan,
-          status: formData.status,
-          max_agents: formData.max_agents,
-          max_messages_month: formData.max_messages_month,
-        });
+        // Regular admins can only update their own tenant
+        if (selectedTenant) {
+          const { error } = await supabase
+            .from("tenants")
+            .update({
+              name: formData.name,
+              slug: formData.slug,
+              plan: formData.plan,
+              status: formData.status,
+              max_agents: formData.max_agents,
+              max_messages_month: formData.max_messages_month,
+            })
+            .eq("id", selectedTenant.id);
 
-        if (error) throw error;
+          if (error) throw error;
 
-        toast({
-          title: "Sucesso",
-          description: "Cliente criado com sucesso!",
-        });
+          toast({
+            title: "Sucesso",
+            description: "Cliente atualizado com sucesso!",
+          });
+        }
       }
 
       setIsDialogOpen(false);
@@ -278,14 +292,20 @@ export default function Tenants() {
     setFormLoading(true);
 
     try {
-      // Note: Deleting tenants might require cascade deletes
-      // This would typically be done via edge function for safety
-      const { error } = await supabase
-        .from("tenants")
-        .delete()
-        .eq("id", selectedTenant.id);
+      if (isSuperAdmin) {
+        const { data, error } = await supabase.functions.invoke("manage-tenant", {
+          body: {
+            action: "delete",
+            tenant_id: selectedTenant.id,
+          },
+        });
 
-      if (error) throw error;
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+      } else {
+        // Regular users cannot delete tenants
+        throw new Error("Você não tem permissão para excluir clientes.");
+      }
 
       toast({
         title: "Sucesso",
@@ -321,18 +341,30 @@ export default function Tenants() {
         className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
       >
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Clientes</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-foreground">Clientes</h1>
+            {isSuperAdmin && (
+              <Badge className="bg-pink/20 text-pink">
+                <Crown className="w-3 h-3 mr-1" />
+                Super Admin
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground mt-1">
-            Gerencie os clientes (tenants) da plataforma
+            {isSuperAdmin 
+              ? "Gerencie todos os clientes (tenants) da plataforma" 
+              : "Visualize as informações do seu workspace"}
           </p>
         </div>
-        <Button
-          onClick={openCreateDialog}
-          className="bg-gradient-to-r from-purple to-pink hover:opacity-90"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Cliente
-        </Button>
+        {isSuperAdmin && (
+          <Button
+            onClick={openCreateDialog}
+            className="bg-gradient-to-r from-purple to-pink hover:opacity-90"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Cliente
+          </Button>
+        )}
       </motion.div>
 
       {/* Search */}
@@ -369,7 +401,7 @@ export default function Tenants() {
               ? "Tente uma busca diferente"
               : "Comece criando seu primeiro cliente"}
           </p>
-          {!searchQuery && (
+          {!searchQuery && isSuperAdmin && (
             <Button onClick={openCreateDialog}>
               <Plus className="w-4 h-4 mr-2" />
               Criar Cliente
@@ -401,26 +433,28 @@ export default function Tenants() {
                     <p className="text-sm text-muted-foreground">@{tenant.slug}</p>
                   </div>
                 </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <MoreVertical className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => openEditDialog(tenant)}>
-                      <Edit2 className="w-4 h-4 mr-2" />
-                      Editar
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => openDeleteDialog(tenant)}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Excluir
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                {isSuperAdmin && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openEditDialog(tenant)}>
+                        <Edit2 className="w-4 h-4 mr-2" />
+                        Editar
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => openDeleteDialog(tenant)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Excluir
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
 
               <div className="flex gap-2">
@@ -502,9 +536,31 @@ export default function Tenants() {
                 placeholder="slug-do-cliente"
               />
               <p className="text-xs text-muted-foreground">
-                Identificador único usado em URLs
+                URL: app.tryvia.com.br/{formData.slug}
               </p>
             </div>
+
+            {!selectedTenant && isSuperAdmin && (
+              <div className="space-y-2">
+                <Label htmlFor="ownerEmail">Email do Proprietário (opcional)</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="ownerEmail"
+                    type="email"
+                    value={formData.ownerEmail}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, ownerEmail: e.target.value }))
+                    }
+                    placeholder="owner@empresa.com"
+                    className="pl-10"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Se informado, o usuário será adicionado como proprietário do tenant.
+                </p>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -548,34 +604,23 @@ export default function Tenants() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="max_agents">Máx. Agentes</Label>
+                <Label>Máx. Agentes</Label>
                 <Input
-                  id="max_agents"
                   type="number"
-                  min={1}
                   value={formData.max_agents}
                   onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      max_agents: parseInt(e.target.value) || 1,
-                    }))
+                    setFormData((prev) => ({ ...prev, max_agents: parseInt(e.target.value) || 3 }))
                   }
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="max_messages">Máx. Mensagens/Mês</Label>
+                <Label>Máx. Mensagens/Mês</Label>
                 <Input
-                  id="max_messages"
                   type="number"
-                  min={100}
-                  step={100}
                   value={formData.max_messages_month}
                   onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      max_messages_month: parseInt(e.target.value) || 100,
-                    }))
+                    setFormData((prev) => ({ ...prev, max_messages_month: parseInt(e.target.value) || 1000 }))
                   }
                 />
               </div>
@@ -583,53 +628,36 @@ export default function Tenants() {
           </div>
 
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsDialogOpen(false)}
-              disabled={formLoading}
-            >
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={formLoading}
-              className="bg-gradient-to-r from-purple to-pink hover:opacity-90"
-            >
-              {formLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : selectedTenant ? (
-                "Salvar"
-              ) : (
-                "Criar"
-              )}
+            <Button onClick={handleSubmit} disabled={formLoading}>
+              {formLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {selectedTenant ? "Salvar" : "Criar"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir Cliente</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir <strong>{selectedTenant?.name}</strong>?
-              Esta ação não pode ser desfeita e todos os dados associados serão
-              perdidos.
+              Tem certeza que deseja excluir "{selectedTenant?.name}"? 
+              Esta ação não pode ser desfeita e todos os dados do cliente serão permanentemente removidos.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={formLoading}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              disabled={formLoading}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={formLoading}
             >
-              {formLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                "Excluir"
-              )}
+              {formLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Excluir
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
