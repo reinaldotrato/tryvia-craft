@@ -32,30 +32,59 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
     // Create admin client with service role
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Create user client to verify caller is super admin
-    const authHeader = req.headers.get("Authorization");
+    // Get authorization header - try both cases for compatibility
+    const authHeader = req.headers.get("authorization") || req.headers.get("Authorization");
+    
     if (!authHeader) {
       console.error("Missing authorization header");
       return new Response(
-        JSON.stringify({ error: "Missing authorization header" }),
+        JSON.stringify({ error: "Missing authorization header", reason: "missing_token" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
+    // Extract the JWT token from the header
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    
+    if (!token || token === authHeader) {
+      console.error("Invalid authorization header format");
+      return new Response(
+        JSON.stringify({ error: "Invalid authorization header format", reason: "invalid_format" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Token received, length:", token.length);
+
+    // Create user client
+    const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
     });
 
-    // Get current user
-    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
-    if (userError || !user) {
-      console.error("Invalid token or user not found:", userError?.message);
+    // Get current user by passing the token explicitly
+    const { data: { user }, error: userError } = await supabaseUser.auth.getUser(token);
+    
+    if (userError) {
+      console.error("Token validation error:", userError.message);
       return new Response(
-        JSON.stringify({ error: "Unauthorized: Invalid or expired token" }),
+        JSON.stringify({ 
+          error: "Unauthorized: Invalid or expired token", 
+          reason: "invalid_token",
+          details: userError.message 
+        }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!user) {
+      console.error("No user found for token");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized: User not found", reason: "no_user" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -129,12 +158,6 @@ serve(async (req) => {
 
       // If owner email is provided, create or invite them
       if (body.owner?.email) {
-        // Check if user already exists
-        const { data: existingUsers } = await supabaseAdmin
-          .from("profiles")
-          .select("id")
-          .limit(1);
-
         // Try to find user by email in auth.users
         const { data: authUsers, error: authError } = await supabaseAdmin.auth.admin.listUsers();
         
@@ -166,14 +189,14 @@ serve(async (req) => {
           }
         } else {
           // User doesn't exist, create invitation
-          const token = crypto.randomUUID();
+          const inviteToken = crypto.randomUUID();
           const { error: inviteError } = await supabaseAdmin
             .from("invitations")
             .insert({
               tenant_id: newTenant.id,
               email: body.owner.email,
               role: "owner",
-              token,
+              token: inviteToken,
               invited_by: user.id,
               expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
             });
@@ -182,7 +205,6 @@ serve(async (req) => {
             console.error("Error creating invitation:", inviteError);
           } else {
             console.log("Invitation created for:", body.owner.email);
-            // TODO: Send invitation email via Resend
           }
         }
       }
