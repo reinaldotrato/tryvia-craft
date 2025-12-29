@@ -43,6 +43,7 @@ interface RecentConversation {
 export default function Dashboard() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
     totalAgents: 0,
     activeAgents: 0,
@@ -65,16 +66,24 @@ export default function Dashboard() {
     if (!user) return;
     
     setLoading(true);
+    setError(null);
     try {
       // Get tenant info
-      const { data: tenantUser } = await supabase
+      const { data: tenantUser, error: tenantError } = await supabase
         .from("tenant_users")
         .select("tenant_id, tenants(name)")
         .eq("user_id", user.id)
         .eq("status", "active")
-        .single();
+        .maybeSingle();
 
-      if (!tenantUser) throw new Error("Tenant não encontrado");
+      if (tenantError) {
+        console.error("Error fetching tenant:", tenantError);
+        throw new Error("Erro ao buscar workspace. Tente fazer logout e login novamente.");
+      }
+
+      if (!tenantUser) {
+        throw new Error("Você não está associado a nenhum workspace. Entre em contato com um administrador.");
+      }
 
       const tenantId = tenantUser.tenant_id;
       const tenantName = (tenantUser.tenants as any)?.name || "Meu Workspace";
@@ -89,10 +98,9 @@ export default function Dashboard() {
         agentsWithStatsRes,
       ] = await Promise.all([
         supabase.from("agents").select("id, status").eq("tenant_id", tenantId),
-        // Use secure view for conversations (masks phone numbers for non-admins)
-        supabase.from("conversations_secure").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+        supabase.from("conversations").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
         supabase
-          .from("conversations_secure")
+          .from("conversations")
           .select("id", { count: "exact", head: true })
           .eq("tenant_id", tenantId)
           .gte("created_at", new Date().toISOString().split("T")[0]),
@@ -102,7 +110,7 @@ export default function Dashboard() {
           .eq("tenant_id", tenantId)
           .eq("status", "active"),
         supabase
-          .from("conversations_secure")
+          .from("conversations")
           .select("id, contact_name, phone, last_message_at, status, agents(name)")
           .eq("tenant_id", tenantId)
           .order("last_message_at", { ascending: false })
@@ -123,7 +131,7 @@ export default function Dashboard() {
         activeAgents,
         totalConversations: conversationsRes.count || 0,
         todayConversations: todayConversationsRes.count || 0,
-        totalMessages: 0, // Would need to count from messages table
+        totalMessages: 0,
         todayMessages: 0,
         teamMembers: teamRes.count || 0,
         tenantName,
@@ -153,8 +161,9 @@ export default function Dashboard() {
           sent: Math.floor(Math.random() * 45) + 15,
         }))
       );
-    } catch (error) {
-      console.error("Error loading dashboard:", error);
+    } catch (err) {
+      console.error("Error loading dashboard:", err);
+      setError(err instanceof Error ? err.message : "Erro ao carregar dados do dashboard");
     } finally {
       setLoading(false);
     }
@@ -177,6 +186,25 @@ export default function Dashboard() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="w-8 h-8 animate-spin text-purple" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <div className="text-center max-w-md">
+          <h2 className="text-xl font-semibold text-foreground mb-2">Não foi possível carregar o dashboard</h2>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <div className="flex gap-2 justify-center">
+            <Button onClick={loadDashboardData} variant="outline">
+              Tentar novamente
+            </Button>
+            <Button onClick={() => window.location.reload()}>
+              Recarregar página
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -211,34 +239,31 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           title="Agentes Ativos"
-          value={3}
+          value={stats.activeAgents}
           icon={Bot}
           color="purple"
-          trend={{ value: 50, isPositive: true }}
+          trend={stats.totalAgents > 0 ? { value: Math.round((stats.activeAgents / stats.totalAgents) * 100), isPositive: true } : undefined}
           delay={0}
         />
         <KpiCard
           title="Conversas Hoje"
-          value={47}
+          value={stats.todayConversations}
           icon={MessageSquare}
           color="cyan"
-          trend={{ value: 12, isPositive: true }}
           delay={0.1}
         />
         <KpiCard
-          title="Mensagens 24h"
-          value="1.2k"
+          title="Total Conversas"
+          value={stats.totalConversations}
           icon={Send}
           color="pink"
-          trend={{ value: 8, isPositive: true }}
           delay={0.2}
         />
         <KpiCard
-          title="Taxa de Resolução"
-          value="94%"
-          icon={CheckCircle}
+          title="Membros da Equipe"
+          value={stats.teamMembers}
+          icon={Users}
           color="green"
-          trend={{ value: 3, isPositive: true }}
           delay={0.3}
         />
       </div>

@@ -1028,6 +1028,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_tenant_admin: { Args: { p_tenant_id: string }; Returns: boolean }
+      is_tenant_member: { Args: { p_tenant_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "owner" | "admin" | "member" | "viewer"
