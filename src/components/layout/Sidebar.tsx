@@ -25,18 +25,28 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/contexts/PermissionsContext";
+import { Permission } from "@/types/permissions";
 import tryviaLogo from "@/assets/tryvia-logo.png";
 
-const navItems = [
+interface NavItem {
+  icon: React.ElementType;
+  label: string;
+  path: string;
+  badge?: number;
+  permission?: Permission;
+}
+
+const allNavItems: NavItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-  { icon: Bot, label: "Agentes", path: "/agents", badge: 3 },
-  { icon: MessageSquare, label: "Conversas", path: "/conversations", badge: 12 },
-  { icon: Users, label: "Equipe", path: "/team" },
-  { icon: Building2, label: "Clientes", path: "/tenants" },
-  { icon: BarChart3, label: "Analytics", path: "/analytics" },
-  { icon: Activity, label: "Logs", path: "/activity-logs" },
-  { icon: Shield, label: "Segurança", path: "/security" },
-  { icon: Settings, label: "Configurações", path: "/settings" },
+  { icon: Bot, label: "Agentes", path: "/agents", badge: 3, permission: "agents.view" },
+  { icon: MessageSquare, label: "Conversas", path: "/conversations", badge: 12, permission: "conversations.view" },
+  { icon: Users, label: "Equipe", path: "/team", permission: "team.view" },
+  { icon: Building2, label: "Clientes", path: "/tenants", permission: "settings.view" },
+  { icon: BarChart3, label: "Analytics", path: "/analytics", permission: "analytics.view" },
+  { icon: Activity, label: "Logs", path: "/activity-logs", permission: "activity_logs.view" },
+  { icon: Shield, label: "Segurança", path: "/security", permission: "security.view" },
+  { icon: Settings, label: "Configurações", path: "/settings", permission: "settings.view" },
 ];
 
 interface SidebarProps {
@@ -48,6 +58,12 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
+  const { hasPermission, role } = usePermissions();
+
+  // Filtra itens de navegação baseado nas permissões do usuário
+  const navItems = allNavItems.filter(item => 
+    !item.permission || hasPermission(item.permission)
+  );
 
   const handleSignOut = async () => {
     await signOut();
@@ -60,6 +76,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   const userName = user?.user_metadata?.full_name || "Usuário";
   const userEmail = user?.email || "";
+  const roleLabel = role ? { owner: "Proprietário", admin: "Administrador", member: "Membro", viewer: "Visualizador" }[role] : "";
   return (
     <motion.aside
       className={cn(
@@ -206,6 +223,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   >
                     <p className="text-sm font-medium text-foreground">{userName}</p>
                     <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
+                    {roleLabel && (
+                      <span className="text-xs text-purple font-medium">{roleLabel}</span>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
