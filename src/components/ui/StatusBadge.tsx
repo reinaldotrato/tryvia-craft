@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-type StatusType = "active" | "paused" | "draft" | "error" | "success" | "warning" | "info" | "waiting" | "transferred" | "closed";
+type StatusType = "active" | "inactive" | "paused" | "draft" | "error" | "success" | "warning" | "info" | "waiting" | "transferred" | "closed";
 
 interface StatusBadgeProps {
   status: StatusType;
@@ -14,6 +14,11 @@ const statusConfig: Record<StatusType, { bg: string; text: string; dot: string }
     bg: "bg-success/20",
     text: "text-success",
     dot: "bg-success",
+  },
+  inactive: {
+    bg: "bg-muted/30",
+    text: "text-muted-foreground",
+    dot: "bg-muted-foreground",
   },
   paused: {
     bg: "bg-warning/20",
@@ -64,6 +69,7 @@ const statusConfig: Record<StatusType, { bg: string; text: string; dot: string }
 
 const defaultLabels: Record<StatusType, string> = {
   active: "Ativo",
+  inactive: "Desconectado",
   paused: "Pausado",
   draft: "Rascunho",
   error: "Erro",
