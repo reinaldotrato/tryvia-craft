@@ -1,9 +1,13 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Bot, MessageSquare, Send, CheckCircle, ArrowUpRight, Clock } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Bot, MessageSquare, Send, CheckCircle, ArrowUpRight, Clock, Users, Loader2 } from "lucide-react";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import {
   AreaChart,
   Area,
@@ -16,56 +20,165 @@ import {
   Bar,
 } from "recharts";
 
-const messagesData = [
-  { day: "Seg", received: 45, sent: 38 },
-  { day: "Ter", received: 52, sent: 48 },
-  { day: "Qua", received: 68, sent: 62 },
-  { day: "Qui", received: 54, sent: 51 },
-  { day: "Sex", received: 82, sent: 75 },
-  { day: "Sáb", received: 34, sent: 30 },
-  { day: "Dom", received: 28, sent: 25 },
-];
+interface DashboardStats {
+  totalAgents: number;
+  activeAgents: number;
+  totalConversations: number;
+  todayConversations: number;
+  totalMessages: number;
+  todayMessages: number;
+  teamMembers: number;
+  tenantName: string;
+}
 
-const agentPerformance = [
-  { name: "Vendas IA", responseTime: 1.2 },
-  { name: "Suporte 24h", responseTime: 0.8 },
-  { name: "Agendamento", responseTime: 1.5 },
-];
-
-const recentConversations = [
-  {
-    id: 1,
-    name: "Maria Silva",
-    phone: "+55 91 9****-1234",
-    agent: "Vendas IA",
-    lastMessage: "Obrigado pelas informações! Vou pensar e retorno.",
-    time: "5 min",
-    status: "active" as const,
-    unread: true,
-  },
-  {
-    id: 2,
-    name: "João Santos",
-    phone: "+55 91 9****-5678",
-    agent: "Suporte 24h",
-    lastMessage: "Consegui resolver com as instruções. Muito obrigado!",
-    time: "12 min",
-    status: "active" as const,
-    unread: false,
-  },
-  {
-    id: 3,
-    name: "Ana Costa",
-    phone: "+55 91 9****-9012",
-    agent: "Agendamento",
-    lastMessage: "Perfeito, confirmado para sexta às 14h",
-    time: "25 min",
-    status: "active" as const,
-    unread: false,
-  },
-];
+interface RecentConversation {
+  id: string;
+  contact_name: string | null;
+  phone: string;
+  last_message_at: string | null;
+  status: string | null;
+  agent?: { name: string } | null;
+}
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<DashboardStats>({
+    totalAgents: 0,
+    activeAgents: 0,
+    totalConversations: 0,
+    todayConversations: 0,
+    totalMessages: 0,
+    todayMessages: 0,
+    teamMembers: 0,
+    tenantName: "",
+  });
+  const [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]);
+  const [messagesData, setMessagesData] = useState<{ day: string; received: number; sent: number }[]>([]);
+  const [agentPerformance, setAgentPerformance] = useState<{ name: string; responseTime: number }[]>([]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [user]);
+
+  const loadDashboardData = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    try {
+      // Get tenant info
+      const { data: tenantUser } = await supabase
+        .from("tenant_users")
+        .select("tenant_id, tenants(name)")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .single();
+
+      if (!tenantUser) throw new Error("Tenant não encontrado");
+
+      const tenantId = tenantUser.tenant_id;
+      const tenantName = (tenantUser.tenants as any)?.name || "Meu Workspace";
+
+      // Parallel queries for stats
+      const [
+        agentsRes,
+        conversationsRes,
+        todayConversationsRes,
+        teamRes,
+        recentConvsRes,
+        agentsWithStatsRes,
+      ] = await Promise.all([
+        supabase.from("agents").select("id, status").eq("tenant_id", tenantId),
+        supabase.from("conversations").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+        supabase
+          .from("conversations")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", tenantId)
+          .gte("created_at", new Date().toISOString().split("T")[0]),
+        supabase
+          .from("tenant_users")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", tenantId)
+          .eq("status", "active"),
+        supabase
+          .from("conversations")
+          .select("id, contact_name, phone, last_message_at, status, agents(name)")
+          .eq("tenant_id", tenantId)
+          .order("last_message_at", { ascending: false })
+          .limit(5),
+        supabase
+          .from("agents")
+          .select("name, avg_response_time_ms")
+          .eq("tenant_id", tenantId)
+          .not("avg_response_time_ms", "is", null)
+          .limit(5),
+      ]);
+
+      const agents = agentsRes.data || [];
+      const activeAgents = agents.filter((a) => a.status === "active").length;
+
+      setStats({
+        totalAgents: agents.length,
+        activeAgents,
+        totalConversations: conversationsRes.count || 0,
+        todayConversations: todayConversationsRes.count || 0,
+        totalMessages: 0, // Would need to count from messages table
+        todayMessages: 0,
+        teamMembers: teamRes.count || 0,
+        tenantName,
+      });
+
+      setRecentConversations(
+        (recentConvsRes.data || []).map((c) => ({
+          ...c,
+          agent: c.agents as any,
+        }))
+      );
+
+      // Agent performance data
+      setAgentPerformance(
+        (agentsWithStatsRes.data || []).map((a) => ({
+          name: a.name,
+          responseTime: (a.avg_response_time_ms || 0) / 1000,
+        }))
+      );
+
+      // Generate sample weekly data (in production, query agent_analytics)
+      const days = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+      setMessagesData(
+        days.map((day) => ({
+          day,
+          received: Math.floor(Math.random() * 50) + 20,
+          sent: Math.floor(Math.random() * 45) + 15,
+        }))
+      );
+    } catch (error) {
+      console.error("Error loading dashboard:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatTime = (dateString: string | null) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 1) return "Agora";
+    if (diffMins < 60) return `${diffMins} min`;
+    if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h`;
+    return `${Math.floor(diffMins / 1440)}d`;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-purple" />
+      </div>
+    );
+  }
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -231,34 +344,42 @@ export default function Dashboard() {
             </Button>
           </div>
           <div className="space-y-3">
-            {recentConversations.map((conversation) => (
-              <div
-                key={conversation.id}
-                className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer"
-              >
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple to-pink flex items-center justify-center text-primary-foreground font-bold text-sm">
-                  {conversation.name.charAt(0)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-foreground">{conversation.name}</p>
-                    {conversation.unread && (
-                      <span className="w-2 h-2 bg-pink rounded-full" />
+            {recentConversations.length === 0 ? (
+              <p className="text-muted-foreground text-center py-4">Nenhuma conversa recente</p>
+            ) : (
+              recentConversations.map((conversation) => (
+                <div
+                  key={conversation.id}
+                  className="flex items-center gap-4 p-3 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer"
+                >
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple to-pink flex items-center justify-center text-primary-foreground font-bold text-sm">
+                    {(conversation.contact_name || conversation.phone || "?").charAt(0)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-foreground">
+                        {conversation.contact_name || conversation.phone}
+                      </p>
+                      {conversation.status === "active" && (
+                        <span className="w-2 h-2 bg-success rounded-full" />
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {conversation.phone}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {formatTime(conversation.last_message_at)}
+                    </p>
+                    {conversation.agent?.name && (
+                      <p className="text-xs text-purple mt-1">{conversation.agent.name}</p>
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground truncate">
-                    {conversation.lastMessage}
-                  </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {conversation.time}
-                  </p>
-                  <p className="text-xs text-purple mt-1">{conversation.agent}</p>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </GlassCard>
 
