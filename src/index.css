@@ -6,6 +6,70 @@
 
 @layer base {
   :root {
+    --background: 0 0% 98%;
+    --background-secondary: 0 0% 95%;
+    --foreground: 240 10% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 10%;
+
+    --primary: 262 83% 58%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 5% 92%;
+    --secondary-foreground: 240 10% 10%;
+
+    --muted: 240 5% 90%;
+    --muted-foreground: 240 10% 45%;
+
+    --accent: 330 81% 60%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 5% 85%;
+    --input: 240 5% 85%;
+    --ring: 262 83% 58%;
+
+    --radius: 0.75rem;
+
+    /* Brand Colors */
+    --purple-primary: 262 83% 58%;
+    --purple-light: 263 78% 76%;
+    --purple-dark: 263 70% 42%;
+    --pink-primary: 330 81% 60%;
+    --pink-light: 330 86% 71%;
+    --cyan-primary: 189 94% 43%;
+    --cyan-light: 187 92% 53%;
+    --blue-primary: 217 91% 60%;
+
+    /* Status Colors */
+    --success: 160 84% 39%;
+    --warning: 38 92% 50%;
+    --error: 0 84% 60%;
+    --info: 217 91% 60%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(330, 81%, 60%) 0%, hsl(262, 83%, 58%) 50%, hsl(217, 91%, 60%) 100%);
+    --gradient-purple: linear-gradient(135deg, hsl(262, 83%, 58%) 0%, hsl(263, 70%, 42%) 100%);
+    --gradient-glow: linear-gradient(135deg, hsla(262, 83%, 58%, 0.15) 0%, hsla(330, 81%, 60%, 0.08) 100%);
+
+    /* Sidebar */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 240 10% 40%;
+    --sidebar-primary: 262 83% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 5% 95%;
+    --sidebar-accent-foreground: 240 10% 10%;
+    --sidebar-border: 240 5% 90%;
+    --sidebar-ring: 262 83% 58%;
+  }
+
+  .dark {
     --background: 240 20% 6%;
     --background-secondary: 240 17% 12%;
     --foreground: 0 0% 100%;
@@ -34,8 +98,6 @@
     --border: 240 15% 20%;
     --input: 240 15% 20%;
     --ring: 262 83% 58%;
-
-    --radius: 0.75rem;
 
     /* Brand Colors */
     --purple-primary: 262 83% 58%;
@@ -87,13 +149,21 @@
 
 @layer components {
   .glass-card {
-    @apply bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl;
+    @apply bg-card/80 backdrop-blur-xl border border-border rounded-2xl;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
+  .dark .glass-card {
+    @apply bg-white/5 border-white/10;
+  }
+
   .glass-card:hover {
-    @apply bg-white/[0.08] border-purple-500/50;
+    @apply border-purple/50;
     box-shadow: 0 0 30px hsla(262, 83%, 58%, 0.15);
+  }
+
+  .dark .glass-card:hover {
+    @apply bg-white/[0.08];
   }
 
   .gradient-text {

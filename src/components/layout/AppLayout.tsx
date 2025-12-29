@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Search, Bell, Command } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 
 export function AppLayout() {
@@ -46,6 +47,7 @@ export function AppLayout() {
 
             {/* Right Actions */}
             <div className="flex items-center gap-2">
+              <ThemeToggle />
               <Button variant="ghost" size="icon" className="relative">
                 <Bell className="w-5 h-5" />
                 <span className="absolute top-2 right-2 w-2 h-2 bg-pink rounded-full" />
