@@ -20,6 +20,7 @@ import Team from "./pages/Team";
 import AcceptInvite from "./pages/AcceptInvite";
 import Notifications from "./pages/Notifications";
 import ActivityLogs from "./pages/ActivityLogs";
+import SecurityDashboard from "./pages/SecurityDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -67,8 +68,9 @@ const AppRoutes = () => (
       <Route path="/profile" element={<Profile />} />
       <Route path="/tenants" element={<Tenants />} />
       <Route path="/team" element={<Team />} />
-      <Route path="/notifications" element={<Notifications />} />
-      <Route path="/activity-logs" element={<ActivityLogs />} />
+        <Route path="/notifications" element={<Notifications />} />
+        <Route path="/activity-logs" element={<ActivityLogs />} />
+        <Route path="/security" element={<SecurityDashboard />} />
     </Route>
     
     {/* Redirects */}
