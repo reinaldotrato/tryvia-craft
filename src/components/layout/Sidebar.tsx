@@ -13,6 +13,7 @@ import {
   Building2,
   Users,
   Activity,
+  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ const navItems = [
   { icon: Building2, label: "Clientes", path: "/tenants" },
   { icon: BarChart3, label: "Analytics", path: "/analytics" },
   { icon: Activity, label: "Logs", path: "/activity-logs" },
+  { icon: Shield, label: "Segurança", path: "/security" },
   { icon: Settings, label: "Configurações", path: "/settings" },
 ];
 
