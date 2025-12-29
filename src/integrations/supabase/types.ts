@@ -388,6 +388,39 @@ export type Database = {
           },
         ]
       }
+      integration_logs: {
+        Row: {
+          created_at: string
+          details: Json | null
+          event_type: string
+          id: string
+          integration_type: string
+          message: string
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json | null
+          event_type: string
+          id?: string
+          integration_type: string
+          message: string
+          status: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json | null
+          event_type?: string
+          id?: string
+          integration_type?: string
+          message?: string
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       invitations: {
         Row: {
           accepted_at: string | null
