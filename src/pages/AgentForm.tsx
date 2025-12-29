@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -11,6 +11,7 @@ import {
   Save,
   Play,
   Info,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/contexts/PermissionsContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const models = [
   { value: "gpt-4o", label: "GPT-4o", description: "Mais capaz" },
@@ -47,8 +52,15 @@ const promptVariables = [
 export default function AgentForm() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const { tenantId } = usePermissions();
   const isEditing = Boolean(id);
 
+  const [loading, setLoading] = useState(isEditing);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Form state
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [model, setModel] = useState("gpt-4o-mini");
@@ -64,16 +76,151 @@ export default function AgentForm() {
   const [typingDelay, setTypingDelay] = useState([1500]);
   const [webhookUrl, setWebhookUrl] = useState("");
   const [n8nWorkflowId, setN8nWorkflowId] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (isEditing && id) {
+      loadAgent();
+    }
+  }, [id]);
+
+  const loadAgent = async () => {
+    if (!id) return;
+    setLoading(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from("agents")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setName(data.name);
+        setDescription(data.description || "");
+        setModel(data.model || "gpt-4o-mini");
+        setTemperature([data.temperature || 0.7]);
+        setMaxTokens([data.max_tokens || 1000]);
+        setSystemPrompt(data.system_prompt || "");
+        setWelcomeMessage(data.welcome_message || "");
+        setFallbackMessage(data.fallback_message || "");
+        setTransferMessage(data.transfer_message || "");
+        setOutOfHoursMessage(data.out_of_hours_message || "");
+        setContextWindow([data.context_window || 10]);
+        setTypingDelay([data.typing_delay_ms || 1500]);
+        setWebhookUrl(data.webhook_url || "");
+        setN8nWorkflowId(data.n8n_workflow_id || "");
+        
+        const businessHours = data.business_hours as { enabled?: boolean } | null;
+        setBusinessHoursEnabled(businessHours?.enabled || false);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao carregar agente.",
+        variant: "destructive",
+      });
+      navigate("/agents");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSave = async (activate = false) => {
+    if (!name.trim()) {
+      toast({
+        title: "Erro",
+        description: "O nome do agente é obrigatório.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!systemPrompt.trim()) {
+      toast({
+        title: "Erro",
+        description: "O prompt do sistema é obrigatório.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!tenantId) {
+      toast({
+        title: "Erro",
+        description: "Tenant não encontrado.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSaving(true);
-    // Simulate save
-    setTimeout(() => {
-      setIsSaving(false);
+
+    try {
+      const agentData = {
+        name: name.trim(),
+        description: description.trim() || null,
+        model,
+        temperature: temperature[0],
+        max_tokens: maxTokens[0],
+        system_prompt: systemPrompt.trim(),
+        welcome_message: welcomeMessage.trim() || null,
+        fallback_message: fallbackMessage.trim() || null,
+        transfer_message: transferMessage.trim() || null,
+        out_of_hours_message: outOfHoursMessage.trim() || null,
+        business_hours: { enabled: businessHoursEnabled },
+        context_window: contextWindow[0],
+        typing_delay_ms: typingDelay[0],
+        webhook_url: webhookUrl.trim() || null,
+        n8n_workflow_id: n8nWorkflowId.trim() || null,
+        status: activate ? "active" : "draft",
+        tenant_id: tenantId,
+      };
+
+      if (isEditing && id) {
+        const { error } = await supabase
+          .from("agents")
+          .update(agentData)
+          .eq("id", id);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("agents")
+          .insert(agentData);
+
+        if (error) throw error;
+      }
+
+      toast({
+        title: "Sucesso",
+        description: isEditing 
+          ? "Agente atualizado com sucesso!" 
+          : activate 
+            ? "Agente criado e ativado!" 
+            : "Agente salvo como rascunho!",
+      });
+
       navigate("/agents");
-    }, 1000);
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao salvar agente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-purple" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -224,7 +371,7 @@ export default function AgentForm() {
         <TabsContent value="prompt">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <GlassCard className="lg:col-span-2 p-6 space-y-4">
-              <Label htmlFor="systemPrompt">Prompt do Sistema</Label>
+              <Label htmlFor="systemPrompt">Prompt do Sistema *</Label>
               <Textarea
                 id="systemPrompt"
                 placeholder="Você é um assistente de vendas especializado..."
@@ -404,16 +551,20 @@ export default function AgentForm() {
       {/* Footer Actions */}
       <div className="sticky bottom-0 py-4 bg-background/80 backdrop-blur-xl border-t border-border -mx-6 px-6">
         <div className="flex items-center justify-end gap-3 max-w-5xl">
-          <Button variant="outline" onClick={() => navigate("/agents")}>
+          <Button variant="outline" onClick={() => navigate("/agents")} disabled={isSaving}>
             Cancelar
           </Button>
           <Button variant="secondary" onClick={() => handleSave(false)} disabled={isSaving}>
-            <Save className="w-4 h-4" />
+            {isSaving ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
             Salvar Rascunho
           </Button>
           <Button onClick={() => handleSave(true)} disabled={isSaving}>
             {isSaving ? (
-              <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <>
                 <Play className="w-4 h-4" />

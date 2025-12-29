@@ -72,11 +72,12 @@ const AppRoutes = () => (
       <Route path="/integrations" element={<Integrations />} />
       <Route path="/tenants" element={<Tenants />} />
       <Route path="/team" element={<Team />} />
-        <Route path="/notifications" element={<Notifications />} />
-        <Route path="/activity-logs" element={<ActivityLogs />} />
-        <Route path="/security" element={<SecurityDashboard />} />
-        <Route path="/super-admin" element={<SuperAdminDashboard />} />
-        <Route path="/user-permissions" element={<UserPermissions />} />
+      <Route path="/notifications" element={<Notifications />} />
+      <Route path="/activity-logs" element={<ActivityLogs />} />
+      <Route path="/security" element={<SecurityDashboard />} />
+      <Route path="/super-admin" element={<SuperAdminDashboard />} />
+      <Route path="/user-permissions" element={<UserPermissions />} />
+      <Route path="/profile" element={<Profile />} />
     </Route>
     
     {/* Redirects */}
