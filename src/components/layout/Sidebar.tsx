@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/collapsible";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
+import { useProfile } from "@/contexts/ProfileContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Permission } from "@/types/permissions";
 import tryviaLogo from "@/assets/tryvia-logo.png";
@@ -59,6 +60,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { hasPermission, role, isSuperAdmin, tenantId } = usePermissions();
+  const { fullName: profileFullName, avatarUrl } = useProfile();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [conversationCount, setConversationCount] = useState(0);
   const [agentCount, setAgentCount] = useState(0);
@@ -140,13 +142,15 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     navigate("/login");
   };
 
-  const userInitials = user?.user_metadata?.full_name
-    ? user.user_metadata.full_name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()
+  // Use profile context for name (falls back to user metadata)
+  const effectiveFullName = profileFullName || user?.user_metadata?.full_name || "Usuário";
+  
+  const userInitials = effectiveFullName
+    ? effectiveFullName.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()
     : user?.email?.slice(0, 2).toUpperCase() || "??";
 
   // Get first and second name
-  const fullName = user?.user_metadata?.full_name || "Usuário";
-  const nameParts = fullName.split(" ");
+  const nameParts = effectiveFullName.split(" ");
   const displayName = nameParts.length >= 2 
     ? `${nameParts[0]} ${nameParts[1]}` 
     : nameParts[0];
@@ -426,8 +430,12 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 "hover:bg-sidebar-accent transition-colors"
               )}
             >
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple to-pink flex items-center justify-center text-primary-foreground font-bold text-sm shrink-0">
-                {userInitials}
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple to-pink flex items-center justify-center text-primary-foreground font-bold text-sm shrink-0 overflow-hidden">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  userInitials
+                )}
               </div>
               <AnimatePresence>
                 {!collapsed && (
