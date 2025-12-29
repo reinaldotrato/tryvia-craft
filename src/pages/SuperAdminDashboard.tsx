@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, forwardRef } from "react";
 import { motion } from "framer-motion";
 import {
   Crown,
@@ -56,7 +56,7 @@ interface GlobalMetrics {
 
 const COLORS = ["#7c3aed", "#ec4899", "#06b6d4", "#22c55e", "#f59e0b"];
 
-export default function SuperAdminDashboard() {
+const SuperAdminDashboard = forwardRef<HTMLDivElement>((_, ref) => {
   const { toast } = useToast();
   const { isSuperAdmin, loading: permLoading } = usePermissions();
   const navigate = useNavigate();
@@ -360,4 +360,6 @@ export default function SuperAdminDashboard() {
       </GlassCard>
     </div>
   );
-}
+});
+
+export default SuperAdminDashboard;

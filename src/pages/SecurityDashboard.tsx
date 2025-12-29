@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, forwardRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { KpiCard } from "@/components/ui/KpiCard";
@@ -64,7 +64,7 @@ interface SuspiciousActivity {
 
 const COLORS = ["hsl(262, 83%, 58%)", "hsl(330, 81%, 60%)", "hsl(189, 94%, 43%)", "hsl(160, 84%, 39%)"];
 
-export default function SecurityDashboard() {
+const SecurityDashboard = forwardRef<HTMLDivElement>((_, ref) => {
   const [loading, setLoading] = useState(true);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [userProfiles, setUserProfiles] = useState<Record<string, string>>({});
@@ -639,4 +639,6 @@ export default function SecurityDashboard() {
       </motion.div>
     </div>
   );
-}
+});
+
+export default SecurityDashboard;
