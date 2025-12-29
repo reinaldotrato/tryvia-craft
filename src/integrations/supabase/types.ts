@@ -65,6 +65,13 @@ export type Database = {
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "activity_logs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants_secure"
+            referencedColumns: ["id"]
+          },
         ]
       }
       agent_analytics: {
@@ -132,6 +139,13 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_analytics_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants_secure"
             referencedColumns: ["id"]
           },
         ]
@@ -226,6 +240,13 @@ export type Database = {
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "agents_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants_secure"
+            referencedColumns: ["id"]
+          },
         ]
       }
       api_keys: {
@@ -274,6 +295,13 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "api_keys_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants_secure"
             referencedColumns: ["id"]
           },
         ]
@@ -351,6 +379,13 @@ export type Database = {
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "conversations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants_secure"
+            referencedColumns: ["id"]
+          },
         ]
       }
       invitations: {
@@ -396,6 +431,13 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invitations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants_secure"
             referencedColumns: ["id"]
           },
         ]
@@ -457,6 +499,13 @@ export type Database = {
             referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations_secure"
+            referencedColumns: ["id"]
+          },
         ]
       }
       notifications: {
@@ -499,6 +548,13 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants_secure"
             referencedColumns: ["id"]
           },
         ]
@@ -567,6 +623,13 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_users_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants_secure"
             referencedColumns: ["id"]
           },
         ]
@@ -651,7 +714,310 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      activity_logs_secure: {
+        Row: {
+          action: string | null
+          created_at: string | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string | null
+          ip_address: string | null
+          metadata: Json | null
+          new_values: Json | null
+          old_values: Json | null
+          tenant_id: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action?: string | null
+          created_at?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string | null
+          ip_address?: never
+          metadata?: Json | null
+          new_values?: Json | null
+          old_values?: Json | null
+          tenant_id?: string | null
+          user_agent?: never
+          user_id?: string | null
+        }
+        Update: {
+          action?: string | null
+          created_at?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string | null
+          ip_address?: never
+          metadata?: Json | null
+          new_values?: Json | null
+          old_values?: Json | null
+          tenant_id?: string | null
+          user_agent?: never
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_logs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_logs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants_secure"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      api_keys_secure: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          expires_at: string | null
+          id: string | null
+          key_prefix: string | null
+          last_used_at: string | null
+          name: string | null
+          permissions: string[] | null
+          status: string | null
+          tenant_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string | null
+          key_prefix?: string | null
+          last_used_at?: string | null
+          name?: string | null
+          permissions?: string[] | null
+          status?: string | null
+          tenant_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string | null
+          key_prefix?: string | null
+          last_used_at?: string | null
+          name?: string | null
+          permissions?: string[] | null
+          status?: string | null
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_keys_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "api_keys_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants_secure"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations_secure: {
+        Row: {
+          agent_id: string | null
+          closed_at: string | null
+          contact_name: string | null
+          contact_photo_url: string | null
+          context: Json | null
+          created_at: string | null
+          id: string | null
+          is_bot_active: boolean | null
+          last_message_at: string | null
+          phone: string | null
+          sentiment: string | null
+          started_at: string | null
+          status: string | null
+          tags: string[] | null
+          tenant_id: string | null
+          transferred_to: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          closed_at?: string | null
+          contact_name?: string | null
+          contact_photo_url?: string | null
+          context?: Json | null
+          created_at?: string | null
+          id?: string | null
+          is_bot_active?: boolean | null
+          last_message_at?: string | null
+          phone?: never
+          sentiment?: string | null
+          started_at?: string | null
+          status?: string | null
+          tags?: string[] | null
+          tenant_id?: string | null
+          transferred_to?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          closed_at?: string | null
+          contact_name?: string | null
+          contact_photo_url?: string | null
+          context?: Json | null
+          created_at?: string | null
+          id?: string | null
+          is_bot_active?: boolean | null
+          last_message_at?: string | null
+          phone?: never
+          sentiment?: string | null
+          started_at?: string | null
+          status?: string | null
+          tags?: string[] | null
+          tenant_id?: string | null
+          transferred_to?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants_secure"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invitations_secure: {
+        Row: {
+          accepted_at: string | null
+          created_at: string | null
+          email: string | null
+          expires_at: string | null
+          id: string | null
+          invited_by: string | null
+          role: Database["public"]["Enums"]["app_role"] | null
+          status: string | null
+          tenant_id: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string | null
+          email?: string | null
+          expires_at?: string | null
+          id?: string | null
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["app_role"] | null
+          status?: string | null
+          tenant_id?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string | null
+          email?: string | null
+          expires_at?: string | null
+          id?: string | null
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["app_role"] | null
+          status?: string | null
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invitations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invitations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants_secure"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenants_secure: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          logo_url: string | null
+          max_agents: number | null
+          max_messages_month: number | null
+          n8n_api_key: string | null
+          n8n_webhook_base: string | null
+          name: string | null
+          plan: string | null
+          settings: Json | null
+          slug: string | null
+          status: string | null
+          updated_at: string | null
+          zapi_instance_id: string | null
+          zapi_token: string | null
+          zapi_webhook_url: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string | null
+          logo_url?: string | null
+          max_agents?: number | null
+          max_messages_month?: number | null
+          n8n_api_key?: never
+          n8n_webhook_base?: never
+          name?: string | null
+          plan?: string | null
+          settings?: Json | null
+          slug?: string | null
+          status?: string | null
+          updated_at?: string | null
+          zapi_instance_id?: never
+          zapi_token?: never
+          zapi_webhook_url?: never
+        }
+        Update: {
+          created_at?: string | null
+          id?: string | null
+          logo_url?: string | null
+          max_agents?: number | null
+          max_messages_month?: number | null
+          n8n_api_key?: never
+          n8n_webhook_base?: never
+          name?: string | null
+          plan?: string | null
+          settings?: Json | null
+          slug?: string | null
+          status?: string | null
+          updated_at?: string | null
+          zapi_instance_id?: never
+          zapi_token?: never
+          zapi_webhook_url?: never
+        }
+        Relationships: []
+      }
     }
     Functions: {
       get_user_tenant_id: { Args: never; Returns: string }
