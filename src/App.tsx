@@ -15,6 +15,7 @@ import AgentForm from "./pages/AgentForm";
 import Conversations from "./pages/Conversations";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
+import Integrations from "./pages/Integrations";
 import Profile from "./pages/Profile";
 import Tenants from "./pages/Tenants";
 import Team from "./pages/Team";
@@ -66,7 +67,7 @@ const AppRoutes = () => (
       <Route path="/conversations" element={<Conversations />} />
       <Route path="/analytics" element={<Analytics />} />
       <Route path="/settings" element={<Settings />} />
-      <Route path="/profile" element={<Profile />} />
+      <Route path="/integrations" element={<Integrations />} />
       <Route path="/tenants" element={<Tenants />} />
       <Route path="/team" element={<Team />} />
         <Route path="/notifications" element={<Notifications />} />
