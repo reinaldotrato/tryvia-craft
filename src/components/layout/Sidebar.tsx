@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
@@ -21,6 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/contexts/AuthContext";
 import tryviaLogo from "@/assets/tryvia-logo.png";
 
 const navItems = [
@@ -38,7 +38,20 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/login");
+  };
+
+  const userInitials = user?.user_metadata?.full_name
+    ? user.user_metadata.full_name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()
+    : user?.email?.slice(0, 2).toUpperCase() || "??";
+
+  const userName = user?.user_metadata?.full_name || "Usuário";
+  const userEmail = user?.email || "";
   return (
     <motion.aside
       className={cn(
@@ -173,7 +186,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               )}
             >
               <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple to-pink flex items-center justify-center text-primary-foreground font-bold text-sm shrink-0">
-                JD
+                {userInitials}
               </div>
               <AnimatePresence>
                 {!collapsed && (
@@ -183,24 +196,28 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                   >
-                    <p className="text-sm font-medium text-foreground">João da Silva</p>
-                    <p className="text-xs text-muted-foreground truncate">joao@empresa.com</p>
+                    <p className="text-sm font-medium text-foreground">{userName}</p>
+                    <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
                   </motion.div>
                 )}
               </AnimatePresence>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem>
-              <User className="w-4 h-4 mr-2" />
-              Perfil
+            <DropdownMenuItem asChild>
+              <Link to="/settings">
+                <User className="w-4 h-4 mr-2" />
+                Perfil
+              </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Settings className="w-4 h-4 mr-2" />
-              Configurações
+            <DropdownMenuItem asChild>
+              <Link to="/settings">
+                <Settings className="w-4 h-4 mr-2" />
+                Configurações
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-error focus:text-error">
+            <DropdownMenuItem onClick={handleSignOut} className="text-error focus:text-error">
               <LogOut className="w-4 h-4 mr-2" />
               Sair
             </DropdownMenuItem>
