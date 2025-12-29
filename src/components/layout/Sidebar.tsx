@@ -205,7 +205,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuItem asChild>
-              <Link to="/settings">
+              <Link to="/profile">
                 <User className="w-4 h-4 mr-2" />
                 Perfil
               </Link>
