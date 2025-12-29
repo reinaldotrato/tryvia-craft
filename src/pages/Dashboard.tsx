@@ -31,6 +31,8 @@ interface DashboardStats {
   todayMessages: number;
   teamMembers: number;
   tenantName: string;
+  zapiConnected: boolean;
+  n8nConnected: boolean;
 }
 
 interface RecentConversation {
@@ -55,6 +57,8 @@ export default function Dashboard() {
     todayMessages: 0,
     teamMembers: 0,
     tenantName: "",
+    zapiConnected: false,
+    n8nConnected: false,
   });
   const [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]);
   const [messagesData, setMessagesData] = useState<{ day: string; received: number; sent: number }[]>([]);
@@ -98,6 +102,7 @@ export default function Dashboard() {
         teamRes,
         recentConvsRes,
         agentsWithStatsRes,
+        tenantConfigRes,
       ] = await Promise.all([
         supabase.from("agents").select("id, status").eq("tenant_id", tenantId),
         supabase.from("conversations").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
@@ -123,10 +128,20 @@ export default function Dashboard() {
           .eq("tenant_id", tenantId)
           .not("avg_response_time_ms", "is", null)
           .limit(5),
+        supabase
+          .from("tenants")
+          .select("zapi_instance_id, zapi_token, n8n_api_key, n8n_webhook_base")
+          .eq("id", tenantId)
+          .single(),
       ]);
 
       const agents = agentsRes.data || [];
       const activeAgents = agents.filter((a) => a.status === "active").length;
+      
+      // Check integration status
+      const tenantConfig = tenantConfigRes.data;
+      const zapiConnected = !!(tenantConfig?.zapi_instance_id && tenantConfig?.zapi_token);
+      const n8nConnected = !!(tenantConfig?.n8n_api_key || tenantConfig?.n8n_webhook_base);
 
       setStats({
         totalAgents: agents.length,
@@ -137,6 +152,8 @@ export default function Dashboard() {
         todayMessages: 0,
         teamMembers: teamRes.count || 0,
         tenantName,
+        zapiConnected,
+        n8nConnected,
       });
 
       setRecentConversations(
@@ -427,7 +444,7 @@ export default function Dashboard() {
                   <p className="text-xs text-muted-foreground">WhatsApp</p>
                 </div>
               </div>
-              <StatusBadge status="active" pulse />
+              <StatusBadge status={stats.zapiConnected ? "active" : "inactive"} pulse={stats.zapiConnected} />
             </div>
 
             <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
@@ -440,7 +457,7 @@ export default function Dashboard() {
                   <p className="text-xs text-muted-foreground">Automação</p>
                 </div>
               </div>
-              <StatusBadge status="active" />
+              <StatusBadge status={stats.n8nConnected ? "active" : "inactive"} />
             </div>
 
             <Button variant="outline" className="w-full mt-4" asChild>
