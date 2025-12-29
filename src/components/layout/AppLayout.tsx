@@ -6,8 +6,10 @@ import { Sidebar } from "./Sidebar";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
+import { useInvitationNotifications } from "@/hooks/useInvitationNotifications";
 
 export function AppLayout() {
+  useInvitationNotifications();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
