@@ -61,7 +61,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { user, signOut } = useAuth();
   const { hasPermission, role, isSuperAdmin, effectiveTenantId, isViewingOtherTenant, selectedTenantName } = usePermissions();
   const { fullName: profileFullName, avatarUrl } = useProfile();
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(true);
   const [conversationCount, setConversationCount] = useState(0);
   const [agentCount, setAgentCount] = useState(0);
 
@@ -301,7 +301,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
         {/* Settings with submenu */}
         {hasSettingsAccess && !collapsed && (
-          <Collapsible open={settingsOpen || isSettingsActive} onOpenChange={setSettingsOpen}>
+          <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
             <CollapsibleTrigger asChild>
               <button
                 className={cn(
@@ -329,7 +329,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 <ChevronDown
                   className={cn(
                     "w-4 h-4 transition-transform",
-                    (settingsOpen || isSettingsActive) && "rotate-180"
+                    settingsOpen && "rotate-180"
                   )}
                 />
               </button>
