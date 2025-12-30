@@ -30,6 +30,7 @@ import {
 import { GlassCard } from "@/components/ui/GlassCard";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -91,6 +92,7 @@ const ITEMS_PER_PAGE = 20;
 
 export default function ActivityLogs() {
   const { user } = useAuth();
+  const { effectiveTenantId, isAdmin: permIsAdmin } = usePermissions();
   const { toast } = useToast();
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,7 +106,7 @@ export default function ActivityLogs() {
 
   useEffect(() => {
     loadLogs();
-  }, [user, actionFilter, entityFilter, dateFilter, page]);
+  }, [user, effectiveTenantId, actionFilter, entityFilter, dateFilter, page]);
 
   const getDateRange = () => {
     const end = new Date();
@@ -132,21 +134,12 @@ export default function ActivityLogs() {
   };
 
   const loadLogs = async () => {
-    if (!user) return;
+    if (!user || !effectiveTenantId) return;
     setLoading(true);
 
     try {
-      // Check if user is admin/owner
-      const { data: tenantUser } = await supabase
-        .from("tenant_users")
-        .select("tenant_id, role")
-        .eq("user_id", user.id)
-        .eq("status", "active")
-        .single();
-
-      if (!tenantUser) throw new Error("Tenant não encontrado");
-
-      const userIsAdmin = tenantUser.role === "owner" || tenantUser.role === "admin";
+      // Use permission context for admin status
+      const userIsAdmin = permIsAdmin;
       setIsAdmin(userIsAdmin);
 
       const { start, end } = getDateRange();
@@ -156,6 +149,7 @@ export default function ActivityLogs() {
       let query = supabase
         .from("activity_logs_secure")
         .select("*", { count: "exact" })
+        .eq("tenant_id", effectiveTenantId)
         .gte("created_at", start.toISOString())
         .lte("created_at", end.toISOString())
         .order("created_at", { ascending: false })

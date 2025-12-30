@@ -59,7 +59,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
-  const { hasPermission, role, isSuperAdmin, tenantId } = usePermissions();
+  const { hasPermission, role, isSuperAdmin, effectiveTenantId, isViewingOtherTenant, selectedTenantName } = usePermissions();
   const { fullName: profileFullName, avatarUrl } = useProfile();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [conversationCount, setConversationCount] = useState(0);
@@ -67,20 +67,20 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   // Load real counts
   useEffect(() => {
-    if (tenantId) {
+    if (effectiveTenantId) {
       loadCounts();
     }
-  }, [tenantId]);
+  }, [effectiveTenantId]);
 
   const loadCounts = async () => {
-    if (!tenantId) return;
+    if (!effectiveTenantId) return;
 
     try {
       // Count active conversations
       const { count: convCount } = await supabase
         .from("conversations")
         .select("id", { count: "exact", head: true })
-        .eq("tenant_id", tenantId)
+        .eq("tenant_id", effectiveTenantId)
         .eq("status", "active");
 
       setConversationCount(convCount || 0);
@@ -89,7 +89,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       const { count: agCount } = await supabase
         .from("agents")
         .select("id", { count: "exact", head: true })
-        .eq("tenant_id", tenantId);
+        .eq("tenant_id", effectiveTenantId);
 
       setAgentCount(agCount || 0);
     } catch (error) {

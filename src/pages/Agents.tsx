@@ -84,7 +84,7 @@ const avatarColors = [
 
 export default function Agents() {
   const { user } = useAuth();
-  const { tenantId, hasPermission } = usePermissions();
+  const { effectiveTenantId, hasPermission } = usePermissions();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -98,10 +98,10 @@ export default function Agents() {
 
   useEffect(() => {
     loadAgents();
-  }, [user, tenantId]);
+  }, [user, effectiveTenantId]);
 
   const loadAgents = async () => {
-    if (!tenantId) {
+    if (!effectiveTenantId) {
       setLoading(false);
       return;
     }
@@ -111,7 +111,7 @@ export default function Agents() {
       const { data, error } = await supabase
         .from("agents")
         .select("*")
-        .eq("tenant_id", tenantId)
+        .eq("tenant_id", effectiveTenantId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;

@@ -61,7 +61,7 @@ interface Message {
 
 export default function Conversations() {
   const { toast } = useToast();
-  const { tenantId, hasPermission } = usePermissions();
+  const { effectiveTenantId, hasPermission } = usePermissions();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
@@ -76,7 +76,7 @@ export default function Conversations() {
 
   // Load conversations
   const loadConversations = useCallback(async () => {
-    if (!tenantId) return;
+    if (!effectiveTenantId) return;
     
     try {
       const { data, error } = await supabase
@@ -86,7 +86,7 @@ export default function Conversations() {
           is_bot_active, last_message_at, agent_id, tags,
           agents:agent_id (name)
         `)
-        .eq("tenant_id", tenantId)
+        .eq("tenant_id", effectiveTenantId)
         .order("last_message_at", { ascending: false });
 
       if (error) throw error;
@@ -111,7 +111,7 @@ export default function Conversations() {
     } finally {
       setLoading(false);
     }
-  }, [tenantId, selectedConversation, toast]);
+  }, [effectiveTenantId, selectedConversation, toast]);
 
   // Load messages for selected conversation
   const loadMessages = useCallback(async () => {

@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { supabase } from "@/integrations/supabase/client";
 import {
   LineChart,
@@ -63,6 +64,7 @@ interface SentimentData {
 
 export default function Analytics() {
   const { user } = useAuth();
+  const { effectiveTenantId } = usePermissions();
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState("7d");
   const [selectedAgent, setSelectedAgent] = useState("all");
@@ -82,7 +84,7 @@ export default function Analytics() {
 
   useEffect(() => {
     loadAnalytics();
-  }, [user, dateRange, selectedAgent]);
+  }, [user, effectiveTenantId, dateRange, selectedAgent]);
 
   const getDateRange = () => {
     const end = endOfDay(new Date());
@@ -106,21 +108,11 @@ export default function Analytics() {
   };
 
   const loadAnalytics = async () => {
-    if (!user) return;
+    if (!user || !effectiveTenantId) return;
     setLoading(true);
 
     try {
-      // Get tenant
-      const { data: tenantUser } = await supabase
-        .from("tenant_users")
-        .select("tenant_id")
-        .eq("user_id", user.id)
-        .eq("status", "active")
-        .single();
-
-      if (!tenantUser) throw new Error("Tenant not found");
-
-      const tenantId = tenantUser.tenant_id;
+      const tenantId = effectiveTenantId;
       const { start, end } = getDateRange();
 
       // Load agents for dropdown
