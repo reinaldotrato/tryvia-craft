@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.send-whatsapp]
 verify_jwt = true
+
+[functions.get-agent-config]
+verify_jwt = false
+
+[functions.sync-conversation]
+verify_jwt = false
