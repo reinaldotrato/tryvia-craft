@@ -155,6 +155,7 @@ export default function Tenants() {
   const [integrationsConfig, setIntegrationsConfig] = useState({
     zapi_instance_id: "",
     zapi_token: "",
+    zapi_client_token: "",
     zapi_webhook_url: "",
     n8n_api_key: "",
     n8n_webhook_base: "",
@@ -550,7 +551,7 @@ export default function Tenants() {
     try {
       const { data, error } = await supabase
         .from("tenants")
-        .select("zapi_instance_id, zapi_token, zapi_webhook_url, n8n_api_key, n8n_webhook_base")
+        .select("zapi_instance_id, zapi_token, zapi_client_token, zapi_webhook_url, n8n_api_key, n8n_webhook_base")
         .eq("id", tenant.id)
         .single();
 
@@ -559,6 +560,7 @@ export default function Tenants() {
       setIntegrationsConfig({
         zapi_instance_id: data?.zapi_instance_id || "",
         zapi_token: data?.zapi_token || "",
+        zapi_client_token: data?.zapi_client_token || "",
         zapi_webhook_url: data?.zapi_webhook_url || "",
         n8n_api_key: data?.n8n_api_key || "",
         n8n_webhook_base: data?.n8n_webhook_base || "",
@@ -584,6 +586,7 @@ export default function Tenants() {
         .update({
           zapi_instance_id: integrationsConfig.zapi_instance_id || null,
           zapi_token: integrationsConfig.zapi_token || null,
+          zapi_client_token: integrationsConfig.zapi_client_token || null,
           zapi_webhook_url: integrationsConfig.zapi_webhook_url || null,
           n8n_api_key: integrationsConfig.n8n_api_key || null,
           n8n_webhook_base: integrationsConfig.n8n_webhook_base || null,
@@ -619,9 +622,16 @@ export default function Tenants() {
 
     setTestingZapi(true);
     try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (integrationsConfig.zapi_client_token) {
+        headers["Client-Token"] = integrationsConfig.zapi_client_token;
+      }
+      
       const response = await fetch(
         `https://api.z-api.io/instances/${integrationsConfig.zapi_instance_id}/token/${integrationsConfig.zapi_token}/status`,
-        { method: "GET" }
+        { method: "GET", headers }
       );
 
       if (response.ok) {
@@ -1191,6 +1201,35 @@ export default function Tenants() {
                         )}
                       </Button>
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Client Token (Segurança)</Label>
+                    <div className="relative">
+                      <Input
+                        type={showSecrets["zapi_client_token"] ? "text" : "password"}
+                        value={integrationsConfig.zapi_client_token}
+                        onChange={(e) => updateIntegrationsConfig("zapi_client_token", e.target.value)}
+                        placeholder="Token de segurança da conta"
+                        className="pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-full px-3"
+                        onClick={() => toggleSecret("zapi_client_token")}
+                      >
+                        {showSecrets["zapi_client_token"] ? (
+                          <EyeOff className="w-4 h-4 text-muted-foreground" />
+                        ) : (
+                          <Eye className="w-4 h-4 text-muted-foreground" />
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Obrigatório se "Segurança da Conta" estiver ativo
+                    </p>
                   </div>
 
                   <div className="space-y-2">
