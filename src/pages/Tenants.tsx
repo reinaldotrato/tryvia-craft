@@ -295,65 +295,89 @@ export default function Tenants() {
     setFormLoading(true);
 
     try {
-      if (isSuperAdmin) {
-        // Verify session is valid before calling edge function
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError || !session) {
-          toast({
-            title: "Sessão expirada",
-            description: "Por favor, faça login novamente.",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        // Super admins use the edge function
-        const { data, error } = await supabase.functions.invoke("manage-tenant", {
-          body: {
-            action: selectedTenant ? "update" : "create",
-            tenant_id: selectedTenant?.id,
-            tenant: {
-              name: formData.name,
-              slug: formData.slug,
-              plan: formData.plan,
-              status: formData.status,
-              max_agents: formData.max_agents,
-              max_messages_month: formData.max_messages_month,
-            },
-            owner: formData.ownerEmail ? { email: formData.ownerEmail } : undefined,
-          },
+      // Verify session is valid
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        toast({
+          title: "Sessão expirada",
+          description: "Por favor, faça login novamente.",
+          variant: "destructive",
         });
+        return;
+      }
+
+      if (selectedTenant) {
+        // UPDATE - same logic for super admins and regular admins
+        const { error } = await supabase
+          .from("tenants")
+          .update({
+            name: formData.name,
+            slug: formData.slug,
+            plan: formData.plan,
+            status: formData.status,
+            max_agents: formData.max_agents,
+            max_messages_month: formData.max_messages_month,
+          })
+          .eq("id", selectedTenant.id);
 
         if (error) throw error;
-        if (data?.error) throw new Error(data.error);
 
         toast({
           title: "Sucesso",
-          description: selectedTenant ? "Cliente atualizado com sucesso!" : "Cliente criado com sucesso!",
+          description: "Cliente atualizado com sucesso!",
         });
-      } else {
-        // Regular admins can only update their own tenant
-        if (selectedTenant) {
-          const { error } = await supabase
-            .from("tenants")
-            .update({
-              name: formData.name,
-              slug: formData.slug,
-              plan: formData.plan,
-              status: formData.status,
-              max_agents: formData.max_agents,
-              max_messages_month: formData.max_messages_month,
-            })
-            .eq("id", selectedTenant.id);
+      } else if (isSuperAdmin) {
+        // CREATE - only super admins can create new tenants
+        const { data: newTenant, error: createError } = await supabase
+          .from("tenants")
+          .insert({
+            name: formData.name,
+            slug: formData.slug,
+            plan: formData.plan,
+            status: formData.status,
+            max_agents: formData.max_agents,
+            max_messages_month: formData.max_messages_month,
+          })
+          .select()
+          .single();
 
-          if (error) throw error;
+        if (createError) throw createError;
 
+        // If owner email was provided, create an invitation
+        if (formData.ownerEmail && newTenant) {
+          const token = crypto.randomUUID();
+          const { error: inviteError } = await supabase
+            .from("invitations")
+            .insert({
+              tenant_id: newTenant.id,
+              email: formData.ownerEmail,
+              role: "owner" as AppRole,
+              token,
+              expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            });
+
+          if (inviteError) {
+            console.error("Erro ao criar convite:", inviteError);
+            toast({
+              title: "Cliente criado",
+              description: "Cliente criado, mas houve erro ao enviar convite ao proprietário.",
+              variant: "default",
+            });
+          } else {
+            toast({
+              title: "Sucesso",
+              description: "Cliente criado e convite enviado ao proprietário!",
+            });
+          }
+        } else {
           toast({
             title: "Sucesso",
-            description: "Cliente atualizado com sucesso!",
+            description: "Cliente criado com sucesso!",
           });
         }
+      } else {
+        throw new Error("Você não tem permissão para criar clientes.");
       }
 
       setIsDialogOpen(false);
@@ -375,32 +399,29 @@ export default function Tenants() {
     setFormLoading(true);
 
     try {
-      if (isSuperAdmin) {
-        // Verify session is valid before calling edge function
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError || !session) {
-          toast({
-            title: "Sessão expirada",
-            description: "Por favor, faça login novamente.",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        const { data, error } = await supabase.functions.invoke("manage-tenant", {
-          body: {
-            action: "delete",
-            tenant_id: selectedTenant.id,
-          },
+      // Verify session is valid
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        toast({
+          title: "Sessão expirada",
+          description: "Por favor, faça login novamente.",
+          variant: "destructive",
         });
+        return;
+      }
 
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
-      } else {
-        // Regular users cannot delete tenants
+      if (!isSuperAdmin) {
         throw new Error("Você não tem permissão para excluir clientes.");
       }
+
+      // Super admin deletes directly via query
+      const { error } = await supabase
+        .from("tenants")
+        .delete()
+        .eq("id", selectedTenant.id);
+
+      if (error) throw error;
 
       toast({
         title: "Sucesso",
