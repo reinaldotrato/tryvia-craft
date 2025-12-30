@@ -102,8 +102,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
     { icon: Bot, label: "Agentes", path: "/agents", badge: agentCount > 0 ? agentCount : undefined, permission: "agents.view" },
     { icon: MessageSquare, label: "Conversas", path: "/conversations", badge: conversationCount > 0 ? conversationCount : undefined, permission: "conversations.view" },
-    { icon: Users, label: "Equipe", path: "/team", permission: "team.view" },
-    { icon: Building2, label: "Clientes", path: "/tenants", permission: "settings.view" },
     { icon: BarChart3, label: "Analytics", path: "/analytics", permission: "analytics.view" },
     { icon: Plug, label: "Integrações", path: "/integrations", permission: "settings.view" },
   ];
@@ -111,6 +109,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   // Settings submenu items
   const settingsSubItems: NavItem[] = [
     { icon: Settings, label: "Geral", path: "/settings", permission: "settings.view" },
+    { icon: Users, label: "Equipe", path: "/team", permission: "team.view" },
+    { icon: Building2, label: "Clientes", path: "/tenants", permission: "settings.view" },
     { icon: Activity, label: "Logs", path: "/activity-logs", permission: "activity_logs.view" },
     { icon: Shield, label: "Segurança", path: "/security", permission: "security.view" },
     { icon: Key, label: "Permissões", path: "/user-permissions", permission: "team.manage" },
