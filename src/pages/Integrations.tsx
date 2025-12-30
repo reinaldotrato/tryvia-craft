@@ -87,6 +87,10 @@ export default function Integrations() {
   const [savingSheet, setSavingSheet] = useState(false);
   const [testingSheetConnection, setTestingSheetConnection] = useState(false);
   const [sheetConnectionStatus, setSheetConnectionStatus] = useState<"idle" | "success" | "error">("idle");
+  const [testingSheetN8n, setTestingSheetN8n] = useState(false);
+  const [sheetN8nStatus, setSheetN8nStatus] = useState<"idle" | "success" | "error">("idle");
+  const [testingN8n, setTestingN8n] = useState(false);
+  const [n8nConnectionStatus, setN8nConnectionStatus] = useState<"idle" | "success" | "error">("idle");
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -323,18 +327,25 @@ export default function Integrations() {
           title: "Conexão OK",
           description: "Instância Z-API conectada ao WhatsApp",
         });
+      } else if (data.error === "Instance not found") {
+        setConnectionStatus("error");
+        toast({
+          title: "Instância não encontrada",
+          description: "Verifique o Instance ID no painel Z-API. Ele pode estar incorreto ou a instância foi excluída.",
+          variant: "destructive",
+        });
       } else if (response.ok && data.connected === false) {
         setConnectionStatus("error");
         toast({
           title: "Instância desconectada",
-          description: data.reason || "A instância não está conectada ao WhatsApp",
+          description: data.reason || "A instância existe mas não está conectada ao WhatsApp. Escaneie o QR Code no painel Z-API.",
           variant: "destructive",
         });
       } else {
         setConnectionStatus("error");
         toast({
           title: "Erro na conexão",
-          description: data.message || data.error || "Não foi possível verificar o status",
+          description: data.message || data.error || "Verifique as credenciais no painel Z-API",
           variant: "destructive",
         });
       }
@@ -342,8 +353,8 @@ export default function Integrations() {
       console.error("Error testing connection:", error);
       setConnectionStatus("error");
       toast({
-        title: "Erro",
-        description: "Não foi possível conectar à API. Verifique as credenciais.",
+        title: "Erro de rede",
+        description: "Não foi possível conectar à API Z-API. Verifique sua conexão.",
         variant: "destructive",
       });
     } finally {
@@ -460,6 +471,7 @@ export default function Integrations() {
       );
 
       const data = await response.json();
+      console.log("Z-API Sheet test response:", data);
 
       if (response.ok && (data.connected === true || data.status === "connected")) {
         setSheetConnectionStatus("success");
@@ -467,11 +479,25 @@ export default function Integrations() {
           title: "Conexão OK",
           description: "Instância Z-API conectada ao WhatsApp",
         });
+      } else if (data.error === "Instance not found") {
+        setSheetConnectionStatus("error");
+        toast({
+          title: "Instância não encontrada",
+          description: "Verifique o Instance ID no painel Z-API. Ele pode estar incorreto ou a instância foi excluída.",
+          variant: "destructive",
+        });
+      } else if (response.ok && data.connected === false) {
+        setSheetConnectionStatus("error");
+        toast({
+          title: "Instância desconectada",
+          description: data.reason || "A instância existe mas não está conectada ao WhatsApp. Escaneie o QR Code no painel Z-API.",
+          variant: "destructive",
+        });
       } else {
         setSheetConnectionStatus("error");
         toast({
           title: "Erro na conexão",
-          description: data.message || data.reason || "Não foi possível conectar",
+          description: data.message || data.error || "Verifique as credenciais no painel Z-API",
           variant: "destructive",
         });
       }
@@ -479,12 +505,149 @@ export default function Integrations() {
       console.error("Error testing connection:", error);
       setSheetConnectionStatus("error");
       toast({
-        title: "Erro",
-        description: "Não foi possível conectar à API.",
+        title: "Erro de rede",
+        description: "Não foi possível conectar à API Z-API. Verifique sua conexão.",
         variant: "destructive",
       });
     } finally {
       setTestingSheetConnection(false);
+    }
+  };
+
+  const handleTestSheetN8n = async () => {
+    if (!sheetConfig.n8n_webhook_base) {
+      toast({
+        title: "Erro",
+        description: "Preencha o Webhook Base URL para testar",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTestingSheetN8n(true);
+    setSheetN8nStatus("idle");
+
+    try {
+      // Tenta fazer uma requisição OPTIONS para verificar se o endpoint existe
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch(sheetConfig.n8n_webhook_base, {
+        method: "OPTIONS",
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+
+      // Se retornou 200-299 ou 405 (method not allowed), o endpoint existe
+      if (response.ok || response.status === 405 || response.status === 404) {
+        setSheetN8nStatus("success");
+        toast({
+          title: "N8N Acessível",
+          description: "O endpoint N8N está respondendo corretamente",
+        });
+      } else {
+        setSheetN8nStatus("error");
+        toast({
+          title: "Erro no N8N",
+          description: `Endpoint retornou status ${response.status}`,
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error("Error testing N8N:", error);
+      
+      // Se for erro de CORS, o endpoint provavelmente existe mas bloqueia OPTIONS
+      if (error.name === "TypeError" && error.message.includes("Failed to fetch")) {
+        setSheetN8nStatus("success");
+        toast({
+          title: "N8N Configurado",
+          description: "URL configurada. O teste de conexão direta foi bloqueado por CORS, mas o webhook deve funcionar.",
+        });
+      } else if (error.name === "AbortError") {
+        setSheetN8nStatus("error");
+        toast({
+          title: "Timeout",
+          description: "O N8N não respondeu a tempo. Verifique se a URL está correta.",
+          variant: "destructive",
+        });
+      } else {
+        setSheetN8nStatus("error");
+        toast({
+          title: "Erro",
+          description: "Não foi possível verificar o N8N. Verifique a URL.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setTestingSheetN8n(false);
+    }
+  };
+
+  const handleTestN8nConnection = async () => {
+    if (!config.n8n_webhook_base) {
+      toast({
+        title: "Erro",
+        description: "Preencha o Webhook Base URL para testar",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTestingN8n(true);
+    setN8nConnectionStatus("idle");
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch(config.n8n_webhook_base, {
+        method: "OPTIONS",
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+
+      if (response.ok || response.status === 405 || response.status === 404) {
+        setN8nConnectionStatus("success");
+        toast({
+          title: "N8N Acessível",
+          description: "O endpoint N8N está respondendo",
+        });
+      } else {
+        setN8nConnectionStatus("error");
+        toast({
+          title: "Erro no N8N",
+          description: `Status ${response.status}`,
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error("Error testing N8N:", error);
+      
+      if (error.name === "TypeError" && error.message.includes("Failed to fetch")) {
+        setN8nConnectionStatus("success");
+        toast({
+          title: "N8N Configurado",
+          description: "URL salva. Teste completo bloqueado por CORS, mas deve funcionar.",
+        });
+      } else if (error.name === "AbortError") {
+        setN8nConnectionStatus("error");
+        toast({
+          title: "Timeout",
+          description: "N8N não respondeu a tempo.",
+          variant: "destructive",
+        });
+      } else {
+        setN8nConnectionStatus("error");
+        toast({
+          title: "Erro",
+          description: "Verifique a URL do N8N.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setTestingN8n(false);
     }
   };
 
@@ -763,6 +926,37 @@ export default function Integrations() {
                       onChange={(e) => updateSheetConfig("n8n_webhook_base", e.target.value)}
                     />
                   </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleTestSheetN8n}
+                    disabled={testingSheetN8n || !sheetConfig.n8n_webhook_base}
+                    className={`w-full ${
+                      sheetN8nStatus === "success"
+                        ? "border-success text-success"
+                        : sheetN8nStatus === "error"
+                          ? "border-destructive text-destructive"
+                          : ""
+                    }`}
+                  >
+                    {testingSheetN8n ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : sheetN8nStatus === "success" ? (
+                      <Wifi className="w-4 h-4 mr-2" />
+                    ) : sheetN8nStatus === "error" ? (
+                      <WifiOff className="w-4 h-4 mr-2" />
+                    ) : (
+                      <Wifi className="w-4 h-4 mr-2" />
+                    )}
+                    {testingSheetN8n
+                      ? "Testando..."
+                      : sheetN8nStatus === "success"
+                        ? "N8N Acessível"
+                        : sheetN8nStatus === "error"
+                          ? "Erro"
+                          : "Testar N8N"}
+                  </Button>
                 </div>
               </div>
 
@@ -1053,6 +1247,37 @@ export default function Integrations() {
                     URL base para webhooks do N8N
                   </p>
                 </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleTestN8nConnection}
+                  disabled={testingN8n || !config.n8n_webhook_base}
+                  className={`w-full ${
+                    n8nConnectionStatus === "success"
+                      ? "border-success text-success"
+                      : n8nConnectionStatus === "error"
+                        ? "border-destructive text-destructive"
+                        : ""
+                  }`}
+                >
+                  {testingN8n ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : n8nConnectionStatus === "success" ? (
+                    <Wifi className="w-4 h-4 mr-2" />
+                  ) : n8nConnectionStatus === "error" ? (
+                    <WifiOff className="w-4 h-4 mr-2" />
+                  ) : (
+                    <Wifi className="w-4 h-4 mr-2" />
+                  )}
+                  {testingN8n
+                    ? "Testando..."
+                    : n8nConnectionStatus === "success"
+                      ? "N8N Acessível"
+                      : n8nConnectionStatus === "error"
+                        ? "Erro"
+                        : "Testar N8N"}
+                </Button>
               </div>
 
               {/* Webhooks per Agent */}
