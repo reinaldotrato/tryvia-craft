@@ -16,8 +16,12 @@ import {
   UserPlus,
   Shield,
   Eye,
+  EyeOff,
   ChevronRight,
   X,
+  Settings,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -144,6 +148,21 @@ export default function Tenants() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<AppRole>("member");
   const [inviteLoading, setInviteLoading] = useState(false);
+
+  // Integrations management state
+  const [isIntegrationsSheetOpen, setIsIntegrationsSheetOpen] = useState(false);
+  const [integrationsTenant, setIntegrationsTenant] = useState<Tenant | null>(null);
+  const [integrationsConfig, setIntegrationsConfig] = useState({
+    zapi_instance_id: "",
+    zapi_token: "",
+    zapi_webhook_url: "",
+    n8n_api_key: "",
+    n8n_webhook_base: "",
+  });
+  const [integrationsLoading, setIntegrationsLoading] = useState(false);
+  const [savingIntegrations, setSavingIntegrations] = useState(false);
+  const [testingZapi, setTestingZapi] = useState(false);
+  const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
 
   // Form state
   const [formData, setFormData] = useState({
@@ -521,6 +540,118 @@ export default function Tenants() {
     }
   };
 
+  // Integrations management functions
+  const openIntegrationsSheet = async (tenant: Tenant) => {
+    setIntegrationsTenant(tenant);
+    setIsIntegrationsSheetOpen(true);
+    setIntegrationsLoading(true);
+    setShowSecrets({});
+
+    try {
+      const { data, error } = await supabase
+        .from("tenants")
+        .select("zapi_instance_id, zapi_token, zapi_webhook_url, n8n_api_key, n8n_webhook_base")
+        .eq("id", tenant.id)
+        .single();
+
+      if (error) throw error;
+
+      setIntegrationsConfig({
+        zapi_instance_id: data?.zapi_instance_id || "",
+        zapi_token: data?.zapi_token || "",
+        zapi_webhook_url: data?.zapi_webhook_url || "",
+        n8n_api_key: data?.n8n_api_key || "",
+        n8n_webhook_base: data?.n8n_webhook_base || "",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao carregar configurações.",
+        variant: "destructive",
+      });
+    } finally {
+      setIntegrationsLoading(false);
+    }
+  };
+
+  const handleSaveIntegrations = async () => {
+    if (!integrationsTenant) return;
+
+    setSavingIntegrations(true);
+    try {
+      const { error } = await supabase
+        .from("tenants")
+        .update({
+          zapi_instance_id: integrationsConfig.zapi_instance_id || null,
+          zapi_token: integrationsConfig.zapi_token || null,
+          zapi_webhook_url: integrationsConfig.zapi_webhook_url || null,
+          n8n_api_key: integrationsConfig.n8n_api_key || null,
+          n8n_webhook_base: integrationsConfig.n8n_webhook_base || null,
+        })
+        .eq("id", integrationsTenant.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Integrações salvas com sucesso!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao salvar integrações.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingIntegrations(false);
+    }
+  };
+
+  const handleTestZapiConnection = async () => {
+    if (!integrationsConfig.zapi_instance_id || !integrationsConfig.zapi_token) {
+      toast({
+        title: "Erro",
+        description: "Preencha o Instance ID e Token para testar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTestingZapi(true);
+    try {
+      const response = await fetch(
+        `https://api.z-api.io/instances/${integrationsConfig.zapi_instance_id}/token/${integrationsConfig.zapi_token}/status`,
+        { method: "GET" }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        toast({
+          title: "Conexão bem-sucedida!",
+          description: `Status: ${data.connected ? "Conectado" : "Desconectado"}`,
+        });
+      } else {
+        throw new Error("Falha na conexão com Z-API");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro de conexão",
+        description: error.message || "Não foi possível conectar à Z-API.",
+        variant: "destructive",
+      });
+    } finally {
+      setTestingZapi(false);
+    }
+  };
+
+  const toggleSecret = (field: string) => {
+    setShowSecrets((prev) => ({ ...prev, [field]: !prev[field] }));
+  };
+
+  const updateIntegrationsConfig = (field: keyof typeof integrationsConfig, value: string) => {
+    setIntegrationsConfig((prev) => ({ ...prev, [field]: value }));
+  };
+
   const filteredTenants = tenants.filter(
     (tenant) =>
       tenant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -640,6 +771,10 @@ export default function Tenants() {
                       <DropdownMenuItem onClick={() => openTeamSheet(tenant)}>
                         <Users className="w-4 h-4 mr-2" />
                         Gerenciar Equipe
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openIntegrationsSheet(tenant)}>
+                        <Settings className="w-4 h-4 mr-2" />
+                        Gerenciar Integrações
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => openEditDialog(tenant)}>
@@ -990,6 +1125,165 @@ export default function Tenants() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Integrations Management Sheet */}
+      <Sheet open={isIntegrationsSheetOpen} onOpenChange={setIsIntegrationsSheetOpen}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Settings className="w-5 h-5" />
+              Integrações - {integrationsTenant?.name}
+            </SheetTitle>
+            <SheetDescription>
+              Configure as integrações Z-API e N8N para este cliente
+            </SheetDescription>
+          </SheetHeader>
+
+          {integrationsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-purple" />
+            </div>
+          ) : (
+            <div className="mt-6 space-y-6">
+              {/* Z-API Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded bg-success/20 flex items-center justify-center">
+                    <Wifi className="w-4 h-4 text-success" />
+                  </div>
+                  <h3 className="font-semibold text-foreground">Z-API</h3>
+                  {integrationsConfig.zapi_instance_id && integrationsConfig.zapi_token && (
+                    <Badge className="bg-success/20 text-success">Configurado</Badge>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label>Instance ID</Label>
+                    <Input
+                      value={integrationsConfig.zapi_instance_id}
+                      onChange={(e) => updateIntegrationsConfig("zapi_instance_id", e.target.value)}
+                      placeholder="ID da instância Z-API"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Token</Label>
+                    <div className="relative">
+                      <Input
+                        type={showSecrets["zapi_token"] ? "text" : "password"}
+                        value={integrationsConfig.zapi_token}
+                        onChange={(e) => updateIntegrationsConfig("zapi_token", e.target.value)}
+                        placeholder="Token de autenticação"
+                        className="pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-full px-3"
+                        onClick={() => toggleSecret("zapi_token")}
+                      >
+                        {showSecrets["zapi_token"] ? (
+                          <EyeOff className="w-4 h-4 text-muted-foreground" />
+                        ) : (
+                          <Eye className="w-4 h-4 text-muted-foreground" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Webhook URL</Label>
+                    <Input
+                      value={integrationsConfig.zapi_webhook_url}
+                      onChange={(e) => updateIntegrationsConfig("zapi_webhook_url", e.target.value)}
+                      placeholder="URL do webhook para receber mensagens"
+                    />
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleTestZapiConnection}
+                    disabled={testingZapi}
+                    className="w-full"
+                  >
+                    {testingZapi ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Wifi className="w-4 h-4 mr-2" />
+                    )}
+                    Testar Conexão
+                  </Button>
+                </div>
+              </div>
+
+              {/* N8N Section */}
+              <div className="space-y-4 pt-4 border-t border-border">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded bg-orange-500/20 flex items-center justify-center">
+                    <Settings className="w-4 h-4 text-orange-500" />
+                  </div>
+                  <h3 className="font-semibold text-foreground">N8N</h3>
+                  {integrationsConfig.n8n_api_key && integrationsConfig.n8n_webhook_base && (
+                    <Badge className="bg-orange-500/20 text-orange-500">Configurado</Badge>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label>API Key</Label>
+                    <div className="relative">
+                      <Input
+                        type={showSecrets["n8n_api_key"] ? "text" : "password"}
+                        value={integrationsConfig.n8n_api_key}
+                        onChange={(e) => updateIntegrationsConfig("n8n_api_key", e.target.value)}
+                        placeholder="Chave de API do N8N"
+                        className="pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-full px-3"
+                        onClick={() => toggleSecret("n8n_api_key")}
+                      >
+                        {showSecrets["n8n_api_key"] ? (
+                          <EyeOff className="w-4 h-4 text-muted-foreground" />
+                        ) : (
+                          <Eye className="w-4 h-4 text-muted-foreground" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Webhook Base URL</Label>
+                    <Input
+                      value={integrationsConfig.n8n_webhook_base}
+                      onChange={(e) => updateIntegrationsConfig("n8n_webhook_base", e.target.value)}
+                      placeholder="https://seu-n8n.com/webhook"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Save Button */}
+              <div className="pt-4 border-t border-border">
+                <Button
+                  onClick={handleSaveIntegrations}
+                  disabled={savingIntegrations}
+                  className="w-full bg-gradient-to-r from-purple to-pink hover:opacity-90"
+                >
+                  {savingIntegrations && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Salvar Integrações
+                </Button>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
