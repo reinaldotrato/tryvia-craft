@@ -20,6 +20,7 @@ import n8nLogo from "@/assets/n8n-logo.png";
 interface IntegrationConfig {
   zapi_instance_id: string;
   zapi_token: string;
+  zapi_client_token: string;
   zapi_webhook_url: string;
   n8n_api_key: string;
   n8n_webhook_base: string;
@@ -46,6 +47,7 @@ interface TenantWithIntegrations {
   logo_url: string | null;
   zapi_instance_id: string | null;
   zapi_token: string | null;
+  zapi_client_token: string | null;
   zapi_webhook_url: string | null;
   n8n_api_key: string | null;
   n8n_webhook_base: string | null;
@@ -61,6 +63,7 @@ export default function Integrations() {
   const [config, setConfig] = useState<IntegrationConfig>({
     zapi_instance_id: "",
     zapi_token: "",
+    zapi_client_token: "",
     zapi_webhook_url: "",
     n8n_api_key: "",
     n8n_webhook_base: "",
@@ -80,6 +83,7 @@ export default function Integrations() {
   const [sheetConfig, setSheetConfig] = useState<IntegrationConfig>({
     zapi_instance_id: "",
     zapi_token: "",
+    zapi_client_token: "",
     zapi_webhook_url: "",
     n8n_api_key: "",
     n8n_webhook_base: "",
@@ -107,11 +111,11 @@ export default function Integrations() {
     try {
       const { data, error } = await supabase
         .from("tenants")
-        .select("id, name, slug, logo_url, zapi_instance_id, zapi_token, zapi_webhook_url, n8n_api_key, n8n_webhook_base")
+        .select("id, name, slug, logo_url, zapi_instance_id, zapi_token, zapi_client_token, zapi_webhook_url, n8n_api_key, n8n_webhook_base")
         .order("name");
 
       if (error) throw error;
-      setAllTenants(data || []);
+      setAllTenants((data || []) as TenantWithIntegrations[]);
     } catch (error) {
       console.error("Error loading tenants:", error);
       toast({
@@ -131,7 +135,7 @@ export default function Integrations() {
     try {
       const { data, error } = await supabase
         .from("tenants")
-        .select("zapi_instance_id, zapi_token, zapi_webhook_url, n8n_api_key, n8n_webhook_base")
+        .select("zapi_instance_id, zapi_token, zapi_client_token, zapi_webhook_url, n8n_api_key, n8n_webhook_base")
         .eq("id", tenantId)
         .single();
 
@@ -140,6 +144,7 @@ export default function Integrations() {
       setConfig({
         zapi_instance_id: data?.zapi_instance_id || "",
         zapi_token: data?.zapi_token || "",
+        zapi_client_token: data?.zapi_client_token || "",
         zapi_webhook_url: data?.zapi_webhook_url || "",
         n8n_api_key: data?.n8n_api_key || "",
         n8n_webhook_base: data?.n8n_webhook_base || "",
@@ -210,6 +215,7 @@ export default function Integrations() {
         .update({
           zapi_instance_id: config.zapi_instance_id || null,
           zapi_token: config.zapi_token || null,
+          zapi_client_token: config.zapi_client_token || null,
           zapi_webhook_url: config.zapi_webhook_url || null,
           n8n_api_key: config.n8n_api_key || null,
           n8n_webhook_base: config.n8n_webhook_base || null,
@@ -308,13 +314,18 @@ export default function Integrations() {
 
     try {
       // Z-API status endpoint
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (config.zapi_client_token) {
+        headers["Client-Token"] = config.zapi_client_token;
+      }
+      
       const response = await fetch(
         `https://api.z-api.io/instances/${config.zapi_instance_id}/token/${config.zapi_token}/status`,
         {
           method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers,
         }
       );
 
@@ -389,6 +400,7 @@ export default function Integrations() {
     setSheetConfig({
       zapi_instance_id: tenant.zapi_instance_id || "",
       zapi_token: tenant.zapi_token || "",
+      zapi_client_token: tenant.zapi_client_token || "",
       zapi_webhook_url: tenant.zapi_webhook_url || "",
       n8n_api_key: tenant.n8n_api_key || "",
       n8n_webhook_base: tenant.n8n_webhook_base || "",
@@ -407,6 +419,7 @@ export default function Integrations() {
         .update({
           zapi_instance_id: sheetConfig.zapi_instance_id || null,
           zapi_token: sheetConfig.zapi_token || null,
+          zapi_client_token: sheetConfig.zapi_client_token || null,
           zapi_webhook_url: sheetConfig.zapi_webhook_url || null,
           n8n_api_key: sheetConfig.n8n_api_key || null,
           n8n_webhook_base: sheetConfig.n8n_webhook_base || null,
@@ -423,6 +436,7 @@ export default function Integrations() {
                 ...t,
                 zapi_instance_id: sheetConfig.zapi_instance_id || null,
                 zapi_token: sheetConfig.zapi_token || null,
+                zapi_client_token: sheetConfig.zapi_client_token || null,
                 zapi_webhook_url: sheetConfig.zapi_webhook_url || null,
                 n8n_api_key: sheetConfig.n8n_api_key || null,
                 n8n_webhook_base: sheetConfig.n8n_webhook_base || null,
@@ -462,11 +476,18 @@ export default function Integrations() {
     setSheetConnectionStatus("idle");
 
     try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (sheetConfig.zapi_client_token) {
+        headers["Client-Token"] = sheetConfig.zapi_client_token;
+      }
+      
       const response = await fetch(
         `https://api.z-api.io/instances/${sheetConfig.zapi_instance_id}/token/${sheetConfig.zapi_token}/status`,
         {
           method: "GET",
-          headers: { "Content-Type": "application/json" },
+          headers,
         }
       );
 
@@ -844,6 +865,30 @@ export default function Integrations() {
                   </div>
 
                   <div className="space-y-2">
+                    <Label htmlFor="sheet_zapi_client_token">Client Token (Segurança)</Label>
+                    <div className="relative">
+                      <Input
+                        id="sheet_zapi_client_token"
+                        type={showSecrets.sheet_zapi_client_token ? "text" : "password"}
+                        placeholder="Token de segurança da conta"
+                        value={sheetConfig.zapi_client_token}
+                        onChange={(e) => updateSheetConfig("zapi_client_token", e.target.value)}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleSecret("sheet_zapi_client_token")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showSecrets.sheet_zapi_client_token ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Obrigatório se "Segurança da Conta" estiver ativo no Z-API
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
                     <Label htmlFor="sheet_zapi_webhook_url">Webhook URL</Label>
                     <Input
                       id="sheet_zapi_webhook_url"
@@ -1071,6 +1116,30 @@ export default function Integrations() {
                       {showSecrets.zapi_token ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="zapi_client_token">Client Token (Segurança)</Label>
+                  <div className="relative">
+                    <Input
+                      id="zapi_client_token"
+                      type={showSecrets.zapi_client_token ? "text" : "password"}
+                      placeholder="Token de segurança da conta"
+                      value={config.zapi_client_token}
+                      onChange={(e) => updateConfig("zapi_client_token", e.target.value)}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => toggleSecret("zapi_client_token")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showSecrets.zapi_client_token ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Obrigatório se "Segurança da Conta" estiver ativo no painel Z-API
+                  </p>
                 </div>
 
                 <div className="space-y-2">
