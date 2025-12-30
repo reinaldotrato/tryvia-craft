@@ -2,8 +2,6 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   User,
-  Building2,
-  Users,
   Key,
   CreditCard,
   Save,
@@ -489,14 +487,6 @@ export default function Settings() {
             <User className="w-4 h-4" />
             Perfil
           </TabsTrigger>
-          <TabsTrigger value="company" className="gap-2 data-[state=active]:bg-purple data-[state=active]:text-primary-foreground">
-            <Building2 className="w-4 h-4" />
-            Empresa
-          </TabsTrigger>
-          <TabsTrigger value="team" className="gap-2 data-[state=active]:bg-purple data-[state=active]:text-primary-foreground">
-            <Users className="w-4 h-4" />
-            Equipe
-          </TabsTrigger>
           <TabsTrigger value="api" className="gap-2 data-[state=active]:bg-purple data-[state=active]:text-primary-foreground">
             <Key className="w-4 h-4" />
             API Keys
@@ -606,79 +596,6 @@ export default function Settings() {
               <Button onClick={saveProfile} disabled={saving}>
                 {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                 Salvar Alterações
-              </Button>
-            </div>
-          </GlassCard>
-        </TabsContent>
-
-        {/* Company */}
-        <TabsContent value="company">
-          <GlassCard className="p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label>Nome da Empresa</Label>
-                <Input 
-                  value={tenantName} 
-                  onChange={(e) => setTenantName(e.target.value)}
-                  disabled={!canManageSettings}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Slug</Label>
-                <Input 
-                  value={tenantSlug} 
-                  onChange={(e) => setTenantSlug(e.target.value)}
-                  disabled={!canManageSettings}
-                />
-                <p className="text-xs text-muted-foreground">
-                  URL: app.tryvia.com.br/{tenantSlug}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Logo</Label>
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-xl bg-white/10 flex items-center justify-center">
-                  {tenant?.logo_url ? (
-                    <img src={tenant.logo_url} alt="Logo" className="w-full h-full object-cover rounded-xl" />
-                  ) : (
-                    <Building2 className="w-8 h-8 text-muted-foreground" />
-                  )}
-                </div>
-                {canManageSettings && (
-                  <Button variant="outline" size="sm">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Upload Logo
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {canManageSettings && (
-              <div className="flex justify-end">
-                <Button onClick={saveTenant} disabled={saving}>
-                  {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                  Salvar
-                </Button>
-              </div>
-            )}
-          </GlassCard>
-        </TabsContent>
-
-        {/* Team */}
-        <TabsContent value="team">
-          <GlassCard className="p-6 space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-foreground">Membros da Equipe</h3>
-                <p className="text-sm text-muted-foreground">
-                  Gerencie os membros da sua equipe na página dedicada.
-                </p>
-              </div>
-              <Button onClick={() => navigate("/team")}>
-                <Users className="w-4 h-4 mr-2" />
-                Ir para Equipe
               </Button>
             </div>
           </GlassCard>
