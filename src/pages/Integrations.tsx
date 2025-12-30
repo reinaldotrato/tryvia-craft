@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Save, Eye, EyeOff, CheckCircle, XCircle, Loader2, ExternalLink, AlertTriangle, RefreshCw, Trash2, Wifi, WifiOff } from "lucide-react";
+import { Save, Eye, EyeOff, CheckCircle, XCircle, Loader2, ExternalLink, AlertTriangle, RefreshCw, Trash2, Wifi, WifiOff, Building2, Settings } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { PermissionGate } from "@/components/PermissionGate";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import zapiLogo from "@/assets/zapi-logo.jpeg";
 import n8nLogo from "@/assets/n8n-logo.png";
 
@@ -37,9 +39,21 @@ interface Agent {
   webhook_url: string | null;
 }
 
+interface TenantWithIntegrations {
+  id: string;
+  name: string;
+  slug: string;
+  logo_url: string | null;
+  zapi_instance_id: string | null;
+  zapi_token: string | null;
+  zapi_webhook_url: string | null;
+  n8n_api_key: string | null;
+  n8n_webhook_base: string | null;
+}
+
 export default function Integrations() {
   const { user } = useAuth();
-  const { tenantId, isAdmin } = usePermissions();
+  const { tenantId, isAdmin, isSuperAdmin } = usePermissions();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -59,13 +73,52 @@ export default function Integrations() {
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"idle" | "success" | "error">("idle");
 
+  // Super Admin states
+  const [allTenants, setAllTenants] = useState<TenantWithIntegrations[]>([]);
+  const [selectedTenant, setSelectedTenant] = useState<TenantWithIntegrations | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [sheetConfig, setSheetConfig] = useState<IntegrationConfig>({
+    zapi_instance_id: "",
+    zapi_token: "",
+    zapi_webhook_url: "",
+    n8n_api_key: "",
+    n8n_webhook_base: "",
+  });
+  const [savingSheet, setSavingSheet] = useState(false);
+  const [testingSheetConnection, setTestingSheetConnection] = useState(false);
+  const [sheetConnectionStatus, setSheetConnectionStatus] = useState<"idle" | "success" | "error">("idle");
+
   useEffect(() => {
-    if (tenantId) {
+    if (isSuperAdmin) {
+      loadAllTenants();
+    } else if (tenantId) {
       loadConfig();
       loadLogs();
       loadAgents();
     }
-  }, [tenantId]);
+  }, [isSuperAdmin, tenantId]);
+
+  const loadAllTenants = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("tenants")
+        .select("id, name, slug, logo_url, zapi_instance_id, zapi_token, zapi_webhook_url, n8n_api_key, n8n_webhook_base")
+        .order("name");
+
+      if (error) throw error;
+      setAllTenants(data || []);
+    } catch (error) {
+      console.error("Error loading tenants:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar os clientes",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadConfig = async () => {
     if (!tenantId) return;
@@ -319,6 +372,126 @@ export default function Integrations() {
     }
   };
 
+  // Super Admin: Open sheet to manage tenant integrations
+  const openManageSheet = (tenant: TenantWithIntegrations) => {
+    setSelectedTenant(tenant);
+    setSheetConfig({
+      zapi_instance_id: tenant.zapi_instance_id || "",
+      zapi_token: tenant.zapi_token || "",
+      zapi_webhook_url: tenant.zapi_webhook_url || "",
+      n8n_api_key: tenant.n8n_api_key || "",
+      n8n_webhook_base: tenant.n8n_webhook_base || "",
+    });
+    setSheetConnectionStatus("idle");
+    setIsSheetOpen(true);
+  };
+
+  const handleSaveSheetConfig = async () => {
+    if (!selectedTenant) return;
+
+    setSavingSheet(true);
+    try {
+      const { error } = await supabase
+        .from("tenants")
+        .update({
+          zapi_instance_id: sheetConfig.zapi_instance_id || null,
+          zapi_token: sheetConfig.zapi_token || null,
+          zapi_webhook_url: sheetConfig.zapi_webhook_url || null,
+          n8n_api_key: sheetConfig.n8n_api_key || null,
+          n8n_webhook_base: sheetConfig.n8n_webhook_base || null,
+        })
+        .eq("id", selectedTenant.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setAllTenants(prev =>
+        prev.map(t =>
+          t.id === selectedTenant.id
+            ? {
+                ...t,
+                zapi_instance_id: sheetConfig.zapi_instance_id || null,
+                zapi_token: sheetConfig.zapi_token || null,
+                zapi_webhook_url: sheetConfig.zapi_webhook_url || null,
+                n8n_api_key: sheetConfig.n8n_api_key || null,
+                n8n_webhook_base: sheetConfig.n8n_webhook_base || null,
+              }
+            : t
+        )
+      );
+
+      toast({
+        title: "Sucesso",
+        description: `Integrações de ${selectedTenant.name} atualizadas`,
+      });
+      setIsSheetOpen(false);
+    } catch (error) {
+      console.error("Error saving integrations:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar as integrações",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingSheet(false);
+    }
+  };
+
+  const handleTestSheetConnection = async () => {
+    if (!sheetConfig.zapi_instance_id || !sheetConfig.zapi_token) {
+      toast({
+        title: "Erro",
+        description: "Preencha o Instance ID e Token para testar",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTestingSheetConnection(true);
+    setSheetConnectionStatus("idle");
+
+    try {
+      const response = await fetch(
+        `https://api.z-api.io/instances/${sheetConfig.zapi_instance_id}/token/${sheetConfig.zapi_token}/status`,
+        {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok && (data.connected === true || data.status === "connected")) {
+        setSheetConnectionStatus("success");
+        toast({
+          title: "Conexão OK",
+          description: "Instância Z-API conectada ao WhatsApp",
+        });
+      } else {
+        setSheetConnectionStatus("error");
+        toast({
+          title: "Erro na conexão",
+          description: data.message || data.reason || "Não foi possível conectar",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error testing connection:", error);
+      setSheetConnectionStatus("error");
+      toast({
+        title: "Erro",
+        description: "Não foi possível conectar à API.",
+        variant: "destructive",
+      });
+    } finally {
+      setTestingSheetConnection(false);
+    }
+  };
+
+  const updateSheetConfig = (field: keyof IntegrationConfig, value: string) => {
+    setSheetConfig(prev => ({ ...prev, [field]: value }));
+  };
+
   const isZapiConfigured = config.zapi_instance_id && config.zapi_token;
   const isN8nConfigured = config.n8n_api_key || config.n8n_webhook_base;
 
@@ -330,6 +503,287 @@ export default function Integrations() {
     );
   }
 
+  // Super Admin View: Cards for each tenant
+  if (isSuperAdmin) {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <motion.h1
+            className="text-2xl font-bold text-foreground"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            Integrações por Cliente
+          </motion.h1>
+          <motion.p
+            className="text-muted-foreground"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.1 }}
+          >
+            Gerencie as integrações de todos os clientes
+          </motion.p>
+        </div>
+
+        {/* Tenant Cards Grid */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {allTenants.map((tenant, index) => {
+            const hasZapi = Boolean(tenant.zapi_instance_id && tenant.zapi_token);
+            const hasN8n = Boolean(tenant.n8n_api_key || tenant.n8n_webhook_base);
+
+            return (
+              <motion.div
+                key={tenant.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+              >
+                <GlassCard className="p-5 h-full flex flex-col">
+                  {/* Tenant Header */}
+                  <div className="flex items-center gap-3 mb-4">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={tenant.logo_url || ""} alt={tenant.name} />
+                      <AvatarFallback className="bg-purple/20 text-purple">
+                        <Building2 className="h-5 w-5" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-foreground truncate">{tenant.name}</h3>
+                      <p className="text-xs text-muted-foreground truncate">{tenant.slug}</p>
+                    </div>
+                  </div>
+
+                  {/* Integration Status */}
+                  <div className="space-y-3 flex-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded overflow-hidden">
+                          <img src={zapiLogo} alt="Z-API" className="w-full h-full object-cover" />
+                        </div>
+                        <span className="text-sm text-foreground">Z-API</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {hasZapi ? (
+                          <>
+                            <CheckCircle className="w-4 h-4 text-success" />
+                            <span className="text-xs text-success font-medium">Ativo</span>
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">Inativo</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded bg-[#EA4B71]/20 flex items-center justify-center p-0.5">
+                          <img src={n8nLogo} alt="N8N" className="w-full h-full object-contain" />
+                        </div>
+                        <span className="text-sm text-foreground">N8N</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {hasN8n ? (
+                          <>
+                            <CheckCircle className="w-4 h-4 text-success" />
+                            <span className="text-xs text-success font-medium">Ativo</span>
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">Inativo</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Manage Button */}
+                  <Button
+                    variant="outline"
+                    className="w-full mt-4"
+                    onClick={() => openManageSheet(tenant)}
+                  >
+                    <Settings className="w-4 h-4 mr-2" />
+                    Gerenciar
+                  </Button>
+                </GlassCard>
+              </motion.div>
+            );
+          })}
+
+          {allTenants.length === 0 && (
+            <div className="col-span-full">
+              <GlassCard className="p-8 text-center">
+                <Building2 className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">Nenhum cliente cadastrado</p>
+              </GlassCard>
+            </div>
+          )}
+        </div>
+
+        {/* Sheet for managing tenant integrations */}
+        <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+          <SheetContent className="sm:max-w-lg overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-2">
+                <Settings className="w-5 h-5" />
+                Integrações - {selectedTenant?.name}
+              </SheetTitle>
+              <SheetDescription>
+                Configure as integrações Z-API e N8N para este cliente
+              </SheetDescription>
+            </SheetHeader>
+
+            <div className="space-y-6 mt-6">
+              {/* Z-API Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded overflow-hidden">
+                    <img src={zapiLogo} alt="Z-API" className="w-full h-full object-cover" />
+                  </div>
+                  <h3 className="font-semibold text-foreground">Z-API</h3>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="sheet_zapi_instance_id">Instance ID</Label>
+                    <Input
+                      id="sheet_zapi_instance_id"
+                      placeholder="Seu Instance ID"
+                      value={sheetConfig.zapi_instance_id}
+                      onChange={(e) => updateSheetConfig("zapi_instance_id", e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="sheet_zapi_token">Token</Label>
+                    <div className="relative">
+                      <Input
+                        id="sheet_zapi_token"
+                        type={showSecrets.sheet_zapi_token ? "text" : "password"}
+                        placeholder="Seu Token Z-API"
+                        value={sheetConfig.zapi_token}
+                        onChange={(e) => updateSheetConfig("zapi_token", e.target.value)}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleSecret("sheet_zapi_token")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showSecrets.sheet_zapi_token ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="sheet_zapi_webhook_url">Webhook URL</Label>
+                    <Input
+                      id="sheet_zapi_webhook_url"
+                      placeholder="https://seu-webhook.com/zapi"
+                      value={sheetConfig.zapi_webhook_url}
+                      onChange={(e) => updateSheetConfig("zapi_webhook_url", e.target.value)}
+                    />
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleTestSheetConnection}
+                    disabled={testingSheetConnection || !sheetConfig.zapi_instance_id || !sheetConfig.zapi_token}
+                    className={`w-full ${
+                      sheetConnectionStatus === "success"
+                        ? "border-success text-success"
+                        : sheetConnectionStatus === "error"
+                          ? "border-destructive text-destructive"
+                          : ""
+                    }`}
+                  >
+                    {testingSheetConnection ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : sheetConnectionStatus === "success" ? (
+                      <Wifi className="w-4 h-4 mr-2" />
+                    ) : sheetConnectionStatus === "error" ? (
+                      <WifiOff className="w-4 h-4 mr-2" />
+                    ) : (
+                      <Wifi className="w-4 h-4 mr-2" />
+                    )}
+                    {testingSheetConnection
+                      ? "Testando..."
+                      : sheetConnectionStatus === "success"
+                        ? "Conectado"
+                        : sheetConnectionStatus === "error"
+                          ? "Desconectado"
+                          : "Testar Conexão"}
+                  </Button>
+                </div>
+              </div>
+
+              {/* N8N Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded bg-[#EA4B71]/20 flex items-center justify-center p-1">
+                    <img src={n8nLogo} alt="N8N" className="w-full h-full object-contain" />
+                  </div>
+                  <h3 className="font-semibold text-foreground">N8N</h3>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="sheet_n8n_api_key">API Key</Label>
+                    <div className="relative">
+                      <Input
+                        id="sheet_n8n_api_key"
+                        type={showSecrets.sheet_n8n_api_key ? "text" : "password"}
+                        placeholder="Sua API Key N8N"
+                        value={sheetConfig.n8n_api_key}
+                        onChange={(e) => updateSheetConfig("n8n_api_key", e.target.value)}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleSecret("sheet_n8n_api_key")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showSecrets.sheet_n8n_api_key ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="sheet_n8n_webhook_base">Webhook Base URL</Label>
+                    <Input
+                      id="sheet_n8n_webhook_base"
+                      placeholder="https://seu-n8n.com/webhook"
+                      value={sheetConfig.n8n_webhook_base}
+                      onChange={(e) => updateSheetConfig("n8n_webhook_base", e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-4 border-t">
+                <Button variant="outline" onClick={() => setIsSheetOpen(false)} className="flex-1">
+                  Cancelar
+                </Button>
+                <Button onClick={handleSaveSheetConfig} disabled={savingSheet} className="flex-1">
+                  {savingSheet ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                  Salvar
+                </Button>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
+    );
+  }
+
+  // Regular user view (existing implementation)
   return (
     <PermissionGate permission="settings.edit" showDenied>
       <div className="space-y-6">
