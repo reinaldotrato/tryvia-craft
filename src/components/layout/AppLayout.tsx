@@ -5,9 +5,9 @@ import { Search, Bell, Command } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { TenantSelector } from "@/components/TenantSelector";
 import { cn } from "@/lib/utils";
 import { useInvitationNotifications } from "@/hooks/useInvitationNotifications";
-
 export function AppLayout() {
   useInvitationNotifications();
   const navigate = useNavigate();
@@ -49,7 +49,8 @@ export function AppLayout() {
             </div>
 
             {/* Right Actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              <TenantSelector />
               <ThemeToggle />
               <Button 
                 variant="ghost" 

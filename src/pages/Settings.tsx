@@ -130,9 +130,11 @@ export default function Settings() {
   
   const [copied, setCopied] = useState(false);
 
+  const { effectiveTenantId } = usePermissions();
+
   useEffect(() => {
     loadData();
-  }, [user, tenantId]);
+  }, [user, effectiveTenantId]);
 
   const loadData = async () => {
     if (!user) return;
@@ -152,11 +154,11 @@ export default function Settings() {
       }
       
       // Load tenant
-      if (tenantId) {
+      if (effectiveTenantId) {
         const { data: tenantData } = await supabase
           .from("tenants")
           .select("*")
-          .eq("id", tenantId)
+          .eq("id", effectiveTenantId)
           .single();
         
         if (tenantData) {
@@ -169,7 +171,7 @@ export default function Settings() {
         const { data: keysData } = await supabase
           .from("api_keys")
           .select("*")
-          .eq("tenant_id", tenantId)
+          .eq("tenant_id", effectiveTenantId)
           .eq("status", "active")
           .order("created_at", { ascending: false });
         
@@ -179,7 +181,7 @@ export default function Settings() {
         const { count: agentsC } = await supabase
           .from("agents")
           .select("id", { count: "exact", head: true })
-          .eq("tenant_id", tenantId);
+          .eq("tenant_id", effectiveTenantId);
         
         setAgentsCount(agentsC || 0);
         
@@ -353,14 +355,14 @@ export default function Settings() {
   };
 
   const saveTenant = async () => {
-    if (!tenantId || !canManageSettings) return;
+    if (!effectiveTenantId || !canManageSettings) return;
     setSaving(true);
     
     try {
       const { error } = await supabase
         .from("tenants")
         .update({ name: tenantName, slug: tenantSlug })
-        .eq("id", tenantId);
+        .eq("id", effectiveTenantId);
       
       if (error) throw error;
       
@@ -380,7 +382,7 @@ export default function Settings() {
   };
 
   const generateApiKey = async () => {
-    if (!newApiKeyName || !tenantId) return;
+    if (!newApiKeyName || !effectiveTenantId) return;
     setGeneratingKey(true);
     
     try {
@@ -396,7 +398,7 @@ export default function Settings() {
       const keyHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
       
       const { error } = await supabase.from("api_keys").insert({
-        tenant_id: tenantId,
+        tenant_id: effectiveTenantId,
         name: newApiKeyName,
         key_prefix: keyPrefix,
         key_hash: keyHash,

@@ -8,9 +8,22 @@ import {
   ROLE_PERMISSIONS 
 } from "@/types/permissions";
 
+interface TenantOption {
+  id: string;
+  name: string;
+}
+
 interface ExtendedPermissionsContextType extends PermissionsContextType {
   isSuperAdmin: boolean;
   refreshPermissions: () => Promise<void>;
+  // Tenant selector for Super Admin
+  selectedTenantId: string | null;
+  selectedTenantName: string | null;
+  effectiveTenantId: string | null;
+  setSelectedTenant: (id: string | null, name?: string) => void;
+  availableTenants: TenantOption[];
+  isViewingOtherTenant: boolean;
+  clearTenantSelection: () => void;
 }
 
 const PermissionsContext = createContext<ExtendedPermissionsContextType | undefined>(undefined);
@@ -22,6 +35,30 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
+  
+  // Tenant selector state for Super Admins
+  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
+  const [selectedTenantName, setSelectedTenantName] = useState<string | null>(null);
+  const [availableTenants, setAvailableTenants] = useState<TenantOption[]>([]);
+
+  // Load available tenants for Super Admins
+  const loadAvailableTenants = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("tenants")
+        .select("id, name")
+        .order("name");
+
+      if (error) {
+        console.error("Error loading tenants:", error);
+        return;
+      }
+
+      setAvailableTenants(data || []);
+    } catch (error) {
+      console.error("Error loading tenants:", error);
+    }
+  }, []);
 
   const fetchUserRole = useCallback(async () => {
     if (!user) {
@@ -41,7 +78,13 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
         .eq("user_id", user.id)
         .maybeSingle();
 
-      setIsSuperAdmin(!!superAdminData);
+      const userIsSuperAdmin = !!superAdminData;
+      setIsSuperAdmin(userIsSuperAdmin);
+
+      // Load tenants for super admins
+      if (userIsSuperAdmin) {
+        loadAvailableTenants();
+      }
 
       // Get tenant role
       const { data, error } = await supabase
@@ -78,11 +121,26 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, loadAvailableTenants]);
 
   useEffect(() => {
     fetchUserRole();
   }, [fetchUserRole]);
+
+  // Tenant selection functions for Super Admins
+  const setSelectedTenant = useCallback((id: string | null, name?: string) => {
+    setSelectedTenantId(id);
+    setSelectedTenantName(name || null);
+  }, []);
+
+  const clearTenantSelection = useCallback(() => {
+    setSelectedTenantId(null);
+    setSelectedTenantName(null);
+  }, []);
+
+  // Effective tenant ID: for Super Admins viewing another tenant, use selected; otherwise use their own
+  const effectiveTenantId = isSuperAdmin && selectedTenantId ? selectedTenantId : tenantId;
+  const isViewingOtherTenant = isSuperAdmin && selectedTenantId !== null && selectedTenantId !== tenantId;
 
   const hasPermission = useCallback((permission: Permission): boolean => {
     // Super admins have all permissions
@@ -133,6 +191,14 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
         canViewSensitiveData,
         isSuperAdmin,
         refreshPermissions: fetchUserRole,
+        // Tenant selector
+        selectedTenantId,
+        selectedTenantName,
+        effectiveTenantId,
+        setSelectedTenant,
+        availableTenants,
+        isViewingOtherTenant,
+        clearTenantSelection,
       }}
     >
       {children}

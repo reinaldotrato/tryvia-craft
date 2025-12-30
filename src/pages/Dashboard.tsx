@@ -7,6 +7,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { supabase } from "@/integrations/supabase/client";
 import zapiLogo from "@/assets/zapi-logo.jpeg";
 import n8nLogo from "@/assets/n8n-logo.png";
@@ -46,6 +47,7 @@ interface RecentConversation {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { effectiveTenantId, isSuperAdmin, isViewingOtherTenant, selectedTenantName } = usePermissions();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
@@ -66,33 +68,28 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadDashboardData();
-  }, [user]);
+  }, [user, effectiveTenantId]);
 
   const loadDashboardData = async () => {
-    if (!user) return;
+    if (!user || !effectiveTenantId) return;
     
     setLoading(true);
     setError(null);
     try {
       // Get tenant info
-      const { data: tenantUser, error: tenantError } = await supabase
-        .from("tenant_users")
-        .select("tenant_id, tenants(name)")
-        .eq("user_id", user.id)
-        .eq("status", "active")
-        .maybeSingle();
+      const { data: tenantData, error: tenantError } = await supabase
+        .from("tenants")
+        .select("name, zapi_instance_id, zapi_token, n8n_api_key, n8n_webhook_base")
+        .eq("id", effectiveTenantId)
+        .single();
 
       if (tenantError) {
         console.error("Error fetching tenant:", tenantError);
         throw new Error("Erro ao buscar workspace. Tente fazer logout e login novamente.");
       }
 
-      if (!tenantUser) {
-        throw new Error("Você não está associado a nenhum workspace. Entre em contato com um administrador.");
-      }
-
-      const tenantId = tenantUser.tenant_id;
-      const tenantName = (tenantUser.tenants as any)?.name || "Meu Workspace";
+      const tenantId = effectiveTenantId;
+      const tenantName = tenantData?.name || "Meu Workspace";
 
       // Parallel queries for stats
       const [
@@ -102,7 +99,6 @@ export default function Dashboard() {
         teamRes,
         recentConvsRes,
         agentsWithStatsRes,
-        tenantConfigRes,
       ] = await Promise.all([
         supabase.from("agents").select("id, status").eq("tenant_id", tenantId),
         supabase.from("conversations").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
@@ -128,20 +124,14 @@ export default function Dashboard() {
           .eq("tenant_id", tenantId)
           .not("avg_response_time_ms", "is", null)
           .limit(5),
-        supabase
-          .from("tenants")
-          .select("zapi_instance_id, zapi_token, n8n_api_key, n8n_webhook_base")
-          .eq("id", tenantId)
-          .single(),
       ]);
 
       const agents = agentsRes.data || [];
       const activeAgents = agents.filter((a) => a.status === "active").length;
       
       // Check integration status
-      const tenantConfig = tenantConfigRes.data;
-      const zapiConnected = !!(tenantConfig?.zapi_instance_id && tenantConfig?.zapi_token);
-      const n8nConnected = !!(tenantConfig?.n8n_api_key || tenantConfig?.n8n_webhook_base);
+      const zapiConnected = !!(tenantData?.zapi_instance_id && tenantData?.zapi_token);
+      const n8nConnected = !!(tenantData?.n8n_api_key || tenantData?.n8n_webhook_base);
 
       setStats({
         totalAgents: agents.length,

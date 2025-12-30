@@ -55,7 +55,7 @@ interface TenantWithIntegrations {
 
 export default function Integrations() {
   const { user } = useAuth();
-  const { tenantId, isAdmin, isSuperAdmin } = usePermissions();
+  const { effectiveTenantId, isAdmin, isSuperAdmin } = usePermissions();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -99,12 +99,12 @@ export default function Integrations() {
   useEffect(() => {
     if (isSuperAdmin) {
       loadAllTenants();
-    } else if (tenantId) {
+    } else if (effectiveTenantId) {
       loadConfig();
       loadLogs();
       loadAgents();
     }
-  }, [isSuperAdmin, tenantId]);
+  }, [isSuperAdmin, effectiveTenantId]);
 
   const loadAllTenants = async () => {
     setLoading(true);
@@ -129,14 +129,14 @@ export default function Integrations() {
   };
 
   const loadConfig = async () => {
-    if (!tenantId) return;
+    if (!effectiveTenantId) return;
     
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from("tenants")
         .select("zapi_instance_id, zapi_token, zapi_client_token, zapi_webhook_url, n8n_api_key, n8n_webhook_base")
-        .eq("id", tenantId)
+        .eq("id", effectiveTenantId)
         .single();
 
       if (error) throw error;
@@ -162,13 +162,13 @@ export default function Integrations() {
   };
 
   const loadLogs = async () => {
-    if (!tenantId) return;
+    if (!effectiveTenantId) return;
 
     try {
       const { data, error } = await supabase
         .from("integration_logs")
         .select("id, event_type, status, message, created_at")
-        .eq("tenant_id", tenantId)
+        .eq("tenant_id", effectiveTenantId)
         .eq("integration_type", "zapi")
         .order("created_at", { ascending: false })
         .limit(10);
@@ -181,13 +181,13 @@ export default function Integrations() {
   };
 
   const loadAgents = async () => {
-    if (!tenantId) return;
+    if (!effectiveTenantId) return;
 
     try {
       const { data, error } = await supabase
         .from("agents")
         .select("id, name, webhook_url")
-        .eq("tenant_id", tenantId)
+        .eq("tenant_id", effectiveTenantId)
         .order("name");
 
       if (error) throw error;
@@ -206,7 +206,7 @@ export default function Integrations() {
   };
 
   const handleSave = async () => {
-    if (!tenantId) return;
+    if (!effectiveTenantId) return;
 
     setSaving(true);
     try {
@@ -220,7 +220,7 @@ export default function Integrations() {
           n8n_api_key: config.n8n_api_key || null,
           n8n_webhook_base: config.n8n_webhook_base || null,
         })
-        .eq("id", tenantId);
+        .eq("id", effectiveTenantId);
 
       if (error) throw error;
 
@@ -267,13 +267,13 @@ export default function Integrations() {
   };
 
   const handleClearLogs = async () => {
-    if (!tenantId) return;
+    if (!effectiveTenantId) return;
 
     try {
       const { error } = await supabase
         .from("integration_logs")
         .delete()
-        .eq("tenant_id", tenantId)
+        .eq("tenant_id", effectiveTenantId)
         .eq("integration_type", "zapi");
 
       if (error) throw error;
