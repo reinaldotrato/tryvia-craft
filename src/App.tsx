@@ -26,6 +26,7 @@ import ActivityLogs from "./pages/ActivityLogs";
 import SecurityDashboard from "./pages/SecurityDashboard";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import UserPermissions from "./pages/UserPermissions";
+import ApiKeys from "./pages/ApiKeys";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -78,6 +79,7 @@ const AppRoutes = () => (
       <Route path="/security" element={<SecurityDashboard />} />
       <Route path="/super-admin" element={<SuperAdminDashboard />} />
       <Route path="/user-permissions" element={<UserPermissions />} />
+      <Route path="/api-keys" element={<ApiKeys />} />
       <Route path="/profile" element={<Profile />} />
     </Route>
     
