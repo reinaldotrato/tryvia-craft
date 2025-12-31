@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Bot, MessageSquare, Send, CheckCircle, ArrowUpRight, Clock, Users, Loader2 } from "lucide-react";
+import { Bot, MessageSquare, Send, ArrowUpRight, Clock, Loader2, Forward } from "lucide-react";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -28,9 +28,9 @@ interface DashboardStats {
   activeAgents: number;
   totalConversations: number;
   todayConversations: number;
+  transferredConversations: number;
   totalMessages: number;
   todayMessages: number;
-  teamMembers: number;
   tenantName: string;
   zapiConnected: boolean;
   n8nConnected: boolean;
@@ -55,9 +55,9 @@ export default function Dashboard() {
     activeAgents: 0,
     totalConversations: 0,
     todayConversations: 0,
+    transferredConversations: 0,
     totalMessages: 0,
     todayMessages: 0,
-    teamMembers: 0,
     tenantName: "",
     zapiConnected: false,
     n8nConnected: false,
@@ -96,7 +96,7 @@ export default function Dashboard() {
         agentsRes,
         conversationsRes,
         todayConversationsRes,
-        teamRes,
+        transferredConversationsRes,
         recentConvsRes,
         agentsWithStatsRes,
       ] = await Promise.all([
@@ -108,10 +108,10 @@ export default function Dashboard() {
           .eq("tenant_id", tenantId)
           .gte("created_at", new Date().toISOString().split("T")[0]),
         supabase
-          .from("tenant_users")
+          .from("conversations")
           .select("id", { count: "exact", head: true })
           .eq("tenant_id", tenantId)
-          .eq("status", "active"),
+          .not("transferred_to", "is", null),
         supabase
           .from("conversations")
           .select("id, contact_name, phone, last_message_at, status, agents(name)")
@@ -138,9 +138,9 @@ export default function Dashboard() {
         activeAgents,
         totalConversations: conversationsRes.count || 0,
         todayConversations: todayConversationsRes.count || 0,
+        transferredConversations: transferredConversationsRes.count || 0,
         totalMessages: 0,
         todayMessages: 0,
-        teamMembers: teamRes.count || 0,
         tenantName,
         zapiConnected,
         n8nConnected,
@@ -262,9 +262,9 @@ export default function Dashboard() {
           delay={0.1}
         />
         <KpiCard
-          title="Total Conversas"
-          value={stats.totalConversations}
-          icon={Send}
+          title="Conversas Encaminhadas"
+          value={stats.transferredConversations}
+          icon={Forward}
           color="pink"
           delay={0.2}
         />
