@@ -24,6 +24,7 @@ import {
   WifiOff,
   Copy,
   Clock,
+  Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -157,6 +158,7 @@ export default function Tenants() {
     token: string;
     expires_at: string;
   }[]>([]);
+  const [resendingEmail, setResendingEmail] = useState<string | null>(null);
 
   // Integrations management state
   const [isIntegrationsSheetOpen, setIsIntegrationsSheetOpen] = useState(false);
@@ -619,6 +621,63 @@ export default function Tenants() {
       });
     } finally {
       setInviteLoading(false);
+    }
+  };
+
+  const handleResendInviteEmail = async (invite: { id: string; email: string; role: AppRole; token: string }) => {
+    if (!teamTenant) return;
+    
+    setResendingEmail(invite.id);
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .single();
+
+      const inviterName = profile?.full_name || user.email || "Administrador";
+
+      const cloudSupabaseUrl = "https://pfsmikupgqyezsroqigf.supabase.co";
+      const cloudAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmc21pa3VwZ3F5ZXpzcm9xaWdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMjI0ODYsImV4cCI6MjA4MjU5ODQ4Nn0.-xNL64aZIFPPF3TMFjCdi_umLEitXjJ0NY84-FAfy8M";
+      
+      const emailResponse = await fetch(`${cloudSupabaseUrl}/functions/v1/send-invite-email`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": cloudAnonKey,
+        },
+        body: JSON.stringify({
+          email: invite.email,
+          role: invite.role,
+          tenantName: teamTenant.name,
+          inviterName,
+          token: invite.token,
+        }),
+      });
+
+      if (emailResponse.ok) {
+        toast({
+          title: "Email reenviado!",
+          description: `Um novo email foi enviado para ${invite.email}.`,
+        });
+      } else {
+        const errorData = await emailResponse.json();
+        console.error("Email error:", errorData);
+        throw new Error("Falha ao enviar email");
+      }
+    } catch (error: any) {
+      console.error("Resend email error:", error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao reenviar email.",
+        variant: "destructive",
+      });
+    } finally {
+      setResendingEmail(null);
     }
   };
 
@@ -1215,22 +1274,36 @@ export default function Tenants() {
                         </div>
                       </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const inviteUrl = `${window.location.origin}/accept-invite?token=${invite.token}`;
-                        navigator.clipboard.writeText(inviteUrl);
-                        toast({
-                          title: "Link copiado!",
-                          description: "O link do convite foi copiado para a área de transferência.",
-                        });
-                      }}
-                      className="shrink-0 ml-2"
-                    >
-                      <Copy className="w-4 h-4 mr-1" />
-                      Copiar Link
-                    </Button>
+                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleResendInviteEmail(invite)}
+                        disabled={resendingEmail === invite.id}
+                      >
+                        {resendingEmail === invite.id ? (
+                          <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                        ) : (
+                          <Send className="w-4 h-4 mr-1" />
+                        )}
+                        Reenviar
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const inviteUrl = `${window.location.origin}/accept-invite?token=${invite.token}`;
+                          navigator.clipboard.writeText(inviteUrl);
+                          toast({
+                            title: "Link copiado!",
+                            description: "O link do convite foi copiado para a área de transferência.",
+                          });
+                        }}
+                      >
+                        <Copy className="w-4 h-4 mr-1" />
+                        Copiar
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
