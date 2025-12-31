@@ -22,6 +22,8 @@ import {
   Settings,
   Wifi,
   WifiOff,
+  Copy,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -148,6 +150,13 @@ export default function Tenants() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<AppRole>("member");
   const [inviteLoading, setInviteLoading] = useState(false);
+  const [pendingInvites, setPendingInvites] = useState<{
+    id: string;
+    email: string;
+    role: AppRole;
+    token: string;
+    expires_at: string;
+  }[]>([]);
 
   // Integrations management state
   const [isIntegrationsSheetOpen, setIsIntegrationsSheetOpen] = useState(false);
@@ -470,6 +479,18 @@ export default function Tenants() {
       }));
 
       setTeamMembers(membersWithProfiles);
+
+      // Load pending invitations for this tenant
+      const { data: invitesData, error: invitesError } = await supabase
+        .from("invitations")
+        .select("id, email, role, token, expires_at")
+        .eq("tenant_id", tenant.id)
+        .eq("status", "pending")
+        .gt("expires_at", new Date().toISOString())
+        .order("created_at", { ascending: false });
+
+      if (invitesError) throw invitesError;
+      setPendingInvites(invitesData || []);
     } catch (error: any) {
       toast({
         title: "Erro",
@@ -1118,6 +1139,57 @@ export default function Tenants() {
                         <X className="w-4 h-4" />
                       </Button>
                     )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Pending Invites Section */}
+            {!teamLoading && pendingInvites.length > 0 && (
+              <div className="space-y-3 mt-6">
+                <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  Convites Pendentes ({pendingInvites.length})
+                </h4>
+                {pendingInvites.map((invite) => (
+                  <div
+                    key={invite.id}
+                    className="flex items-center justify-between p-4 rounded-lg bg-muted/50 border border-dashed border-border"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
+                        <Mail className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-foreground truncate">
+                          {invite.email}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Badge className={cn("font-medium text-xs", roleColors[invite.role])}>
+                            {roleLabels[invite.role]}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            Expira em {new Date(invite.expires_at).toLocaleDateString("pt-BR")}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const inviteUrl = `${window.location.origin}/accept-invite?token=${invite.token}`;
+                        navigator.clipboard.writeText(inviteUrl);
+                        toast({
+                          title: "Link copiado!",
+                          description: "O link do convite foi copiado para a área de transferência.",
+                        });
+                      }}
+                      className="shrink-0 ml-2"
+                    >
+                      <Copy className="w-4 h-4 mr-1" />
+                      Copiar Link
+                    </Button>
                   </div>
                 ))}
               </div>
