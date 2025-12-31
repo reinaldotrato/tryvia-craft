@@ -681,6 +681,32 @@ export default function Tenants() {
     }
   };
 
+  const handleCancelInvite = async (inviteId: string) => {
+    try {
+      const { error } = await supabase
+        .from("invitations")
+        .delete()
+        .eq("id", inviteId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Convite cancelado com sucesso!",
+      });
+
+      // Update local state
+      setPendingInvites(prev => prev.filter(inv => inv.id !== inviteId));
+    } catch (error: any) {
+      console.error("Cancel invite error:", error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao cancelar convite.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleRemoveMember = async (memberId: string) => {
     try {
       const { error } = await supabase
@@ -1302,6 +1328,15 @@ export default function Tenants() {
                       >
                         <Copy className="w-4 h-4 mr-1" />
                         Copiar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleCancelInvite(invite.id)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        title="Cancelar convite"
+                      >
+                        <X className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
