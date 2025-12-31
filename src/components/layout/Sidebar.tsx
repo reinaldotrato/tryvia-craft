@@ -19,6 +19,7 @@ import {
   Crown,
   Key,
   KeyRound,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -62,6 +63,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { hasPermission, role, isSuperAdmin, effectiveTenantId, isViewingOtherTenant, selectedTenantName } = usePermissions();
   const { fullName: profileFullName, avatarUrl } = useProfile();
   const [settingsOpen, setSettingsOpen] = useState(true);
+  const [clientesOpen, setClientesOpen] = useState(true);
   const [conversationCount, setConversationCount] = useState(0);
   const [agentCount, setAgentCount] = useState(0);
 
@@ -97,13 +99,18 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     }
   };
 
-  // Main navigation items (without settings submenu items)
+  // Main navigation items (without submenu items)
   const mainNavItems: NavItem[] = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
     { icon: Bot, label: "Agentes", path: "/agents", badge: agentCount > 0 ? agentCount : undefined, permission: "agents.view" },
     { icon: MessageSquare, label: "Conversas", path: "/conversations", badge: conversationCount > 0 ? conversationCount : undefined, permission: "conversations.view" },
     { icon: BarChart3, label: "Analytics", path: "/analytics", permission: "analytics.view" },
-    { icon: Plug, label: "Integrações", path: "/integrations", permission: "settings.view" },
+  ];
+
+  // Clientes submenu items
+  const clientesSubItems: NavItem[] = [
+    { icon: Users, label: "Colaborador", path: "/tenants" },
+    { icon: Plug, label: "Integrações", path: "/integrations" },
   ];
 
   // Settings submenu items
@@ -135,6 +142,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   // Check if any settings path is active
   const isSettingsActive = settingsSubItems.some(item => location.pathname === item.path);
+
+  // Check if any clientes path is active
+  const isClientesActive = clientesSubItems.some(item => location.pathname === item.path);
 
   const handleSignOut = async () => {
     await signOut();
@@ -297,6 +307,93 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             </Link>
           );
         })}
+
+        {/* Clientes with submenu */}
+        {!collapsed && (
+          <Collapsible open={clientesOpen} onOpenChange={setClientesOpen}>
+            <CollapsibleTrigger asChild>
+              <button
+                className={cn(
+                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200",
+                  "group relative",
+                  isClientesActive
+                    ? "bg-gradient-to-r from-purple/20 to-pink/10 text-foreground"
+                    : "text-sidebar-foreground hover:text-foreground hover:bg-sidebar-accent"
+                )}
+              >
+                {isClientesActive && (
+                  <motion.div
+                    className="absolute left-0 w-1 h-6 bg-gradient-to-b from-pink to-purple rounded-r-full"
+                  />
+                )}
+                <Building2
+                  className={cn(
+                    "w-5 h-5 shrink-0 transition-colors",
+                    isClientesActive ? "text-purple" : "group-hover:text-purple"
+                  )}
+                />
+                <span className="text-sm font-medium whitespace-nowrap flex-1 text-left">
+                  Clientes
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "w-4 h-4 transition-transform",
+                    clientesOpen && "rotate-180"
+                  )}
+                />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pl-6 mt-1 space-y-1">
+              {clientesSubItems.map((item) => {
+                const isActive = location.pathname === item.path;
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200",
+                      "group",
+                      isActive
+                        ? "bg-purple/10 text-foreground"
+                        : "text-sidebar-foreground hover:text-foreground hover:bg-sidebar-accent"
+                    )}
+                  >
+                    <item.icon
+                      className={cn(
+                        "w-4 h-4 shrink-0 transition-colors",
+                        isActive ? "text-purple" : "group-hover:text-purple"
+                      )}
+                    />
+                    <span className="text-sm whitespace-nowrap">
+                      {item.label}
+                    </span>
+                  </Link>
+                );
+              })}
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+
+        {/* Collapsed clientes link */}
+        {collapsed && (
+          <Link
+            to="/tenants"
+            className={cn(
+              "flex items-center justify-center px-3 py-2.5 rounded-xl transition-all duration-200",
+              "group relative",
+              isClientesActive
+                ? "bg-gradient-to-r from-purple/20 to-pink/10 text-foreground"
+                : "text-sidebar-foreground hover:text-foreground hover:bg-sidebar-accent"
+            )}
+          >
+            <Building2
+              className={cn(
+                "w-5 h-5 shrink-0 transition-colors",
+                isClientesActive ? "text-purple" : "group-hover:text-purple"
+              )}
+            />
+          </Link>
+        )}
 
         {/* Settings with submenu */}
         {hasSettingsAccess && !collapsed && (
