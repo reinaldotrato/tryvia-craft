@@ -494,32 +494,50 @@ export default function Tenants() {
     setInviteLoading(true);
 
     try {
-      // Get current user profile for inviter name
       const { data: { user } } = await supabase.auth.getUser();
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("id", user?.id)
+      
+      if (!user) {
+        throw new Error("Usuário não autenticado");
+      }
+
+      // Check if email already has pending invitation for this tenant
+      const { data: existingInvite } = await supabase
+        .from("invitations")
+        .select("id")
+        .eq("tenant_id", teamTenant.id)
+        .eq("email", inviteEmail.toLowerCase())
+        .eq("status", "pending")
         .single();
 
-      const inviterName = profile?.full_name || user?.email || "Administrador";
+      if (existingInvite) {
+        throw new Error("Este email já possui um convite pendente para este cliente");
+      }
 
-      // Use edge function to send invite (bypasses RLS with service role)
-      const { data, error } = await supabase.functions.invoke("send-invite", {
-        body: {
-          email: inviteEmail,
-          role: inviteRole,
-          tenantId: teamTenant.id,
-          tenantName: teamTenant.name,
-          inviterName,
-        },
-      });
+      // Generate unique token
+      const token = crypto.randomUUID();
 
-      if (error) throw error;
+      // Create invitation record directly in the database
+      const { error: inviteError } = await supabase
+        .from("invitations")
+        .insert({
+          tenant_id: teamTenant.id,
+          email: inviteEmail.toLowerCase(),
+          role: inviteRole as AppRole,
+          token,
+          invited_by: user.id,
+          status: "pending",
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        });
+
+      if (inviteError) throw inviteError;
+
+      // Build the invite URL for reference
+      const inviteUrl = `${window.location.origin}/accept-invite?token=${token}`;
+      console.log("Invite URL:", inviteUrl);
 
       toast({
-        title: "Convite enviado!",
-        description: `Um email foi enviado para ${inviteEmail}.`,
+        title: "Convite criado!",
+        description: `Convite criado para ${inviteEmail}. O usuário pode acessar via link de convite.`,
       });
 
       setIsInviteDialogOpen(false);
@@ -534,7 +552,7 @@ export default function Tenants() {
       console.error("Invite error:", error);
       toast({
         title: "Erro",
-        description: error.message || "Erro ao enviar convite.",
+        description: error.message || "Erro ao criar convite.",
         variant: "destructive",
       });
     } finally {
