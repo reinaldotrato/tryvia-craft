@@ -552,14 +552,55 @@ export default function Tenants() {
 
       if (inviteError) throw inviteError;
 
-      // Build the invite URL for reference
-      const inviteUrl = `${window.location.origin}/accept-invite?token=${token}`;
-      console.log("Invite URL:", inviteUrl);
+      // Get inviter profile name
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .single();
 
-      toast({
-        title: "Convite criado!",
-        description: `Convite criado para ${inviteEmail}. O usuário pode acessar via link de convite.`,
-      });
+      const inviterName = profile?.full_name || user.email || "Administrador";
+
+      // Send invitation email via edge function (Lovable Cloud)
+      try {
+        const cloudSupabaseUrl = "https://pfsmikupgqyezsroqigf.supabase.co";
+        const cloudAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmc21pa3VwZ3F5ZXpzcm9xaWdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMjI0ODYsImV4cCI6MjA4MjU5ODQ4Nn0.-xNL64aZIFPPF3TMFjCdi_umLEitXjJ0NY84-FAfy8M";
+        
+        const emailResponse = await fetch(`${cloudSupabaseUrl}/functions/v1/send-invite-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": cloudAnonKey,
+          },
+          body: JSON.stringify({
+            email: inviteEmail.toLowerCase(),
+            role: inviteRole,
+            tenantName: teamTenant.name,
+            inviterName,
+            token,
+          }),
+        });
+
+        if (emailResponse.ok) {
+          toast({
+            title: "Convite enviado!",
+            description: `Um email foi enviado para ${inviteEmail}.`,
+          });
+        } else {
+          const errorData = await emailResponse.json();
+          console.error("Email error:", errorData);
+          toast({
+            title: "Convite criado!",
+            description: `Convite criado para ${inviteEmail}, mas o email não pôde ser enviado. Use o botão "Copiar Link" para compartilhar.`,
+          });
+        }
+      } catch (emailError) {
+        console.error("Email sending error:", emailError);
+        toast({
+          title: "Convite criado!",
+          description: `Convite criado para ${inviteEmail}, mas o email não pôde ser enviado. Use o botão "Copiar Link" para compartilhar.`,
+        });
+      }
 
       setIsInviteDialogOpen(false);
       setInviteEmail("");
