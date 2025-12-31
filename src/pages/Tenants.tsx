@@ -954,13 +954,17 @@ export default function Tenants() {
               className="glass-card p-6 space-y-4"
             >
               <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple to-pink flex items-center justify-center text-primary-foreground font-bold text-lg">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple to-pink flex items-center justify-center text-primary-foreground font-bold text-lg flex-shrink-0">
                     {tenant.name.charAt(0).toUpperCase()}
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground">{tenant.name}</h3>
-                    <p className="text-sm text-muted-foreground">@{tenant.slug}</p>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-semibold text-foreground truncate" title={tenant.name}>
+                      {tenant.name}
+                    </h3>
+                    <p className="text-sm text-muted-foreground truncate" title={`@${tenant.slug}`}>
+                      @{tenant.slug}
+                    </p>
                   </div>
                 </div>
                 {isSuperAdmin && (
