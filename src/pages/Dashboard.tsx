@@ -269,9 +269,9 @@ export default function Dashboard() {
           delay={0.2}
         />
         <KpiCard
-          title="Membros da Equipe"
-          value={stats.teamMembers}
-          icon={Users}
+          title="Agentes Conectados"
+          value={stats.totalAgents}
+          icon={Bot}
           color="green"
           delay={0.3}
         />
