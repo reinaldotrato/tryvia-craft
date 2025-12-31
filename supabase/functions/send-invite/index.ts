@@ -64,16 +64,26 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Verify user has permission to invite
-    const { data: tenantUser, error: tenantError } = await supabaseAdmin
+    // Verify user has permission to invite (tenant admin OR super admin)
+    const { data: tenantUser } = await supabaseAdmin
       .from("tenant_users")
       .select("role")
       .eq("user_id", user.id)
       .eq("tenant_id", tenantId)
       .single();
 
-    if (tenantError || !tenantUser || !["owner", "admin"].includes(tenantUser.role)) {
-      console.error("Permission error:", tenantError);
+    // Check if user is super admin
+    const { data: superAdmin } = await supabaseAdmin
+      .from("super_admins")
+      .select("user_id")
+      .eq("user_id", user.id)
+      .single();
+
+    const isSuperAdmin = !!superAdmin;
+    const isTenantAdmin = tenantUser && ["owner", "admin"].includes(tenantUser.role);
+
+    if (!isSuperAdmin && !isTenantAdmin) {
+      console.error("Permission error: User is neither super admin nor tenant admin");
       return new Response(
         JSON.stringify({ error: "You don't have permission to invite users" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }

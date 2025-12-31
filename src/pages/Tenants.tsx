@@ -494,26 +494,32 @@ export default function Tenants() {
     setInviteLoading(true);
 
     try {
-      // Check if user already exists
-      const { data: authUsers } = await supabase.auth.admin?.listUsers?.() || { data: null };
-      
-      // Create invitation
-      const token = crypto.randomUUID();
-      const { error: inviteError } = await supabase
-        .from("invitations")
-        .insert({
-          tenant_id: teamTenant.id,
+      // Get current user profile for inviter name
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user?.id)
+        .single();
+
+      const inviterName = profile?.full_name || user?.email || "Administrador";
+
+      // Use edge function to send invite (bypasses RLS with service role)
+      const { data, error } = await supabase.functions.invoke("send-invite", {
+        body: {
           email: inviteEmail,
           role: inviteRole,
-          token,
-          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        });
+          tenantId: teamTenant.id,
+          tenantName: teamTenant.name,
+          inviterName,
+        },
+      });
 
-      if (inviteError) throw inviteError;
+      if (error) throw error;
 
       toast({
-        title: "Convite criado!",
-        description: `Convite enviado para ${inviteEmail}.`,
+        title: "Convite enviado!",
+        description: `Um email foi enviado para ${inviteEmail}.`,
       });
 
       setIsInviteDialogOpen(false);
@@ -525,6 +531,7 @@ export default function Tenants() {
         openTeamSheet(teamTenant);
       }
     } catch (error: any) {
+      console.error("Invite error:", error);
       toast({
         title: "Erro",
         description: error.message || "Erro ao enviar convite.",
