@@ -12,13 +12,13 @@ import {
   LogOut,
   User,
   Sparkles,
-  Building2,
   Users,
   Activity,
   Shield,
   Plug,
   Crown,
   Key,
+  KeyRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -108,9 +108,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   // Settings submenu items
   const settingsSubItems: NavItem[] = [
-    { icon: Settings, label: "Geral", path: "/settings", permission: "settings.view" },
-    { icon: Users, label: "Equipe", path: "/team", permission: "team.view" },
-    { icon: Building2, label: "Clientes", path: "/tenants", permission: "settings.view" },
+    { icon: Users, label: "Usuários do Sistema", path: "/team", permission: "team.view" },
+    { icon: KeyRound, label: "APIs Keys", path: "/api-keys", permission: "api_keys.view" },
     { icon: Activity, label: "Logs", path: "/activity-logs", permission: "activity_logs.view" },
     { icon: Shield, label: "Segurança", path: "/security", permission: "security.view" },
     { icon: Key, label: "Permissões", path: "/user-permissions", permission: "team.manage" },
@@ -368,7 +367,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {/* Collapsed settings link */}
         {hasSettingsAccess && collapsed && (
           <Link
-            to="/settings"
+            to="/team"
             className={cn(
               "flex items-center justify-center px-3 py-2.5 rounded-xl transition-all duration-200",
               "group relative",
