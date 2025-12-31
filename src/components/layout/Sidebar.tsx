@@ -110,7 +110,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   // Clientes submenu items
   const clientesSubItems: NavItem[] = [
     { icon: Building2, label: "Empresas", path: "/tenants" },
-    { icon: Users, label: "Colaborador", path: "/team" },
+    { icon: Users, label: "Colaboradores", path: "/collaborators" },
     { icon: Plug, label: "Integrações", path: "/integrations" },
   ];
 

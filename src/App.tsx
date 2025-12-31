@@ -20,6 +20,7 @@ import Integrations from "./pages/Integrations";
 import Profile from "./pages/Profile";
 import Tenants from "./pages/Tenants";
 import Team from "./pages/Team";
+import Collaborators from "./pages/Collaborators";
 import AcceptInvite from "./pages/AcceptInvite";
 import Notifications from "./pages/Notifications";
 import ActivityLogs from "./pages/ActivityLogs";
@@ -74,6 +75,7 @@ const AppRoutes = () => (
       <Route path="/integrations" element={<Integrations />} />
       <Route path="/tenants" element={<Tenants />} />
       <Route path="/team" element={<Team />} />
+      <Route path="/collaborators" element={<Collaborators />} />
       <Route path="/notifications" element={<Notifications />} />
       <Route path="/activity-logs" element={<ActivityLogs />} />
       <Route path="/security" element={<SecurityDashboard />} />
