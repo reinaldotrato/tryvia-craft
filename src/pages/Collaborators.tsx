@@ -43,6 +43,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -73,7 +80,7 @@ const statusColors: Record<string, string> = {
 export default function Collaborators() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { effectiveTenantId, isSuperAdmin, role } = usePermissions();
+  const { effectiveTenantId, isSuperAdmin, role, availableTenants } = usePermissions();
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -90,6 +97,7 @@ export default function Collaborators() {
     whatsapp: "",
     job_title: "",
     description: "",
+    tenant_id: "",
   });
 
   const canManage = isSuperAdmin || role === "owner" || role === "admin";
@@ -132,13 +140,23 @@ export default function Collaborators() {
       whatsapp: "",
       job_title: "",
       description: "",
+      tenant_id: effectiveTenantId || "",
     });
     setSelectedCollaborator(null);
     setIsEditing(false);
   };
 
   const openCreateDialog = () => {
-    resetForm();
+    setFormData({
+      name: "",
+      email: "",
+      whatsapp: "",
+      job_title: "",
+      description: "",
+      tenant_id: effectiveTenantId || "",
+    });
+    setSelectedCollaborator(null);
+    setIsEditing(false);
     setIsFormDialogOpen(true);
   };
 
@@ -149,6 +167,7 @@ export default function Collaborators() {
       whatsapp: collaborator.whatsapp || "",
       job_title: collaborator.job_title || "",
       description: collaborator.description || "",
+      tenant_id: collaborator.tenant_id,
     });
     setSelectedCollaborator(collaborator);
     setIsEditing(true);
@@ -170,10 +189,15 @@ export default function Collaborators() {
       return;
     }
 
-    if (!effectiveTenantId) {
+    // Determine target tenant
+    const targetTenantId = isSuperAdmin && formData.tenant_id 
+      ? formData.tenant_id 
+      : effectiveTenantId;
+
+    if (!targetTenantId) {
       toast({
         title: "Erro",
-        description: "Tenant não encontrado.",
+        description: isSuperAdmin ? "Selecione uma empresa." : "Tenant não encontrado.",
         variant: "destructive",
       });
       return;
@@ -206,7 +230,7 @@ export default function Collaborators() {
         const { error } = await supabase
           .from("collaborators")
           .insert({
-            tenant_id: effectiveTenantId,
+            tenant_id: targetTenantId,
             name: formData.name,
             email: formData.email,
             whatsapp: formData.whatsapp || null,
@@ -444,6 +468,28 @@ export default function Collaborators() {
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
+            {/* Tenant selection for Super Admins */}
+            {isSuperAdmin && !isEditing && (
+              <div className="space-y-2">
+                <Label htmlFor="tenant">Empresa *</Label>
+                <Select
+                  value={formData.tenant_id}
+                  onValueChange={(value) => setFormData({ ...formData, tenant_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a empresa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableTenants.map((tenant) => (
+                      <SelectItem key={tenant.id} value={tenant.id}>
+                        {tenant.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="name">Nome *</Label>
               <Input
