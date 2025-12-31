@@ -4,13 +4,10 @@ import { Link } from "react-router-dom";
 import { Bot, MessageSquare, Send, ArrowUpRight, Clock, Loader2, Forward } from "lucide-react";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { supabase } from "@/integrations/supabase/client";
-import zapiLogo from "@/assets/zapi-logo.jpeg";
-import n8nLogo from "@/assets/n8n-logo.png";
 import {
   AreaChart,
   Area,
@@ -365,97 +362,56 @@ export default function Dashboard() {
         </GlassCard>
       </div>
 
-      {/* Recent Conversations & Integrations */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Conversations */}
-        <GlassCard className="lg:col-span-2 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-foreground">
-              Últimas Conversas
-            </h3>
-            <Button variant="ghost" size="sm" className="text-purple">
-              Ver todas
-              <ArrowUpRight className="w-4 h-4 ml-1" />
-            </Button>
-          </div>
-          <div className="space-y-3">
-            {recentConversations.length === 0 ? (
-              <p className="text-muted-foreground text-center py-4">Nenhuma conversa recente</p>
-            ) : (
-              recentConversations.map((conversation) => (
-                <div
-                  key={conversation.id}
-                  className="flex items-center gap-4 p-3 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer"
-                >
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple to-pink flex items-center justify-center text-primary-foreground font-bold text-sm">
-                    {(conversation.contact_name || conversation.phone || "?").charAt(0)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-foreground">
-                        {conversation.contact_name || conversation.phone}
-                      </p>
-                      {conversation.status === "active" && (
-                        <span className="w-2 h-2 bg-success rounded-full" />
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {conversation.phone}
+      {/* Recent Conversations */}
+      <GlassCard className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-foreground">
+            Últimas Conversas
+          </h3>
+          <Button variant="ghost" size="sm" className="text-purple">
+            Ver todas
+            <ArrowUpRight className="w-4 h-4 ml-1" />
+          </Button>
+        </div>
+        <div className="space-y-3">
+          {recentConversations.length === 0 ? (
+            <p className="text-muted-foreground text-center py-4">Nenhuma conversa recente</p>
+          ) : (
+            recentConversations.map((conversation) => (
+              <div
+                key={conversation.id}
+                className="flex items-center gap-4 p-3 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple to-pink flex items-center justify-center text-primary-foreground font-bold text-sm">
+                  {(conversation.contact_name || conversation.phone || "?").charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-foreground">
+                      {conversation.contact_name || conversation.phone}
                     </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {formatTime(conversation.last_message_at)}
-                    </p>
-                    {conversation.agent?.name && (
-                      <p className="text-xs text-purple mt-1">{conversation.agent.name}</p>
+                    {conversation.status === "active" && (
+                      <span className="w-2 h-2 bg-success rounded-full" />
                     )}
                   </div>
+                  <p className="text-sm text-muted-foreground truncate">
+                    {conversation.phone}
+                  </p>
                 </div>
-              ))
-            )}
-          </div>
-        </GlassCard>
-
-        {/* Integration Status */}
-        <GlassCard className="p-6">
-          <h3 className="text-lg font-semibold text-foreground mb-4">
-            Integrações
-          </h3>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center">
-                  <img src={zapiLogo} alt="Z-API" className="w-full h-full object-cover" />
-                </div>
-                <div>
-                  <p className="font-medium text-foreground">Z-API</p>
-                  <p className="text-xs text-muted-foreground">WhatsApp</p>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {formatTime(conversation.last_message_at)}
+                  </p>
+                  {conversation.agent?.name && (
+                    <p className="text-xs text-purple mt-1">{conversation.agent.name}</p>
+                  )}
                 </div>
               </div>
-              <StatusBadge status={stats.zapiConnected ? "active" : "inactive"} pulse={stats.zapiConnected} />
-            </div>
-
-            <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-[#EA4B71]/20 flex items-center justify-center p-1.5">
-                  <img src={n8nLogo} alt="N8N" className="w-full h-full object-contain" />
-                </div>
-                <div>
-                  <p className="font-medium text-foreground">N8N</p>
-                  <p className="text-xs text-muted-foreground">Automação</p>
-                </div>
-              </div>
-              <StatusBadge status={stats.n8nConnected ? "active" : "inactive"} />
-            </div>
-
-            <Button variant="outline" className="w-full mt-4" asChild>
-              <Link to="/integrations">Configurar Integrações</Link>
-            </Button>
-          </div>
-        </GlassCard>
-      </div>
+            ))
+          )}
+        </div>
+      </GlassCard>
     </div>
   );
 }
